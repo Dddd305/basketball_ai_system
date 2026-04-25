@@ -120,7 +120,7 @@ const register = async () => {
   errorMessage.value = ''
 
   try {
-    const response = await fetch('/api/users/register', {
+    const response = await fetch('https://basketball-api-kyiv.onrender.com/api/users/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData.value)

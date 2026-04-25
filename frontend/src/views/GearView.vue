@@ -200,7 +200,7 @@ const fetchUser = async () => {
   // 2. Оновлюємо з сервера, якщо є Інтернет
   if (navigator.onLine) {
     try {
-      const response = await fetch(`/api/users/${currentUserId}`) 
+      const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}`) 
       if (!response.ok) throw new Error('Помилка мережі')
       
       const freshUser = await response.json()
@@ -228,7 +228,7 @@ const addShoe = async () => {
 
   isAddingShoe.value = true
   try {
-    const response = await fetch(`/api/users/${currentUserId}/shoes`, {
+    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}/shoes`, {
       method: 'POST', 
       headers: { 'Content-Type': 'application/json' }, 
       body: JSON.stringify(newShoe.value)
@@ -256,7 +256,7 @@ const deleteShoe = async (shoeId, shoeName) => {
 
   if (!confirm(`Видалити кросівки ${shoeName}?`)) return
   try {
-    const response = await fetch(`/api/shoes/${shoeId}`, { method: 'DELETE' })
+    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/shoes/${shoeId}`, { method: 'DELETE' })
     if (!response.ok) throw new Error('Помилка видалення')
     await fetchUser()
   } catch (error) {

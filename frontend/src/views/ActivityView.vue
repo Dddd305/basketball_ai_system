@@ -169,7 +169,7 @@ const fetchUser = async () => {
   // 2. Оновлення з сервера у фоновому режимі
   if (navigator.onLine) {
     try {
-      const response = await fetch(`/api/users/${currentUserId}`) 
+      const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}`) 
       if (!response.ok) throw new Error('Мережа')
       
       const freshUser = await response.json()
@@ -258,7 +258,7 @@ const submitMetric = async () => {
   }
   
   try {
-    const response = await fetch(`/api/users/${currentUserId}/metrics`, {
+    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}/metrics`, {
       method: 'POST', 
       headers: { 'Content-Type': 'application/json' }, 
       body: JSON.stringify(payload) 
