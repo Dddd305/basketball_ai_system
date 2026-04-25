@@ -327,7 +327,7 @@ const generateDraft = () => {
 const submitExactData = async () => {
   isCalibrating.value = true
   try {
-    const response = await fetch(`'https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}/calibrate`, {
+    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}/calibrate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(draftDays.value)
@@ -357,7 +357,7 @@ const cancelEditing = () => { isEditing.value = false }
 
 const saveProfile = async () => {
   try {
-    const response = await fetch(`'https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}`, {
+    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editForm.value)
     })
     if (!response.ok) throw new Error('Помилка оновлення')
@@ -495,7 +495,7 @@ const fetchUser = async () => {
   // 2. ОНОВЛЕННЯ З ФОНУ: Якщо є Інтернет, тихенько тягнемо найсвіжіші дані з сервера
   if (navigator.onLine) {
     try {
-      const response = await fetch(`'https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}`) 
+      const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}`) 
       if (!response.ok) throw new Error('Помилка мережі')
       
       const freshUser = await response.json()
