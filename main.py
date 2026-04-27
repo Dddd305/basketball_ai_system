@@ -7,6 +7,9 @@ from typing import List, Optional
 import models
 import schemas
 from database import engine, SessionLocal
+import tensorflow as tf
+import pickle
+import numpy as np
 
 # ==========================================
 # 1. ІНІЦІАЛІЗАЦІЯ ТА НАЛАШТУВАННЯ
@@ -227,53 +230,78 @@ def delete_shoe(shoe_id: int, db: Session = Depends(get_db)):
 # 5. ШІ ТА АНАЛІТИКА
 # ==========================================
 
+try:
+    model = tf.keras.models.load_model('basketball_lstm.keras')
+    with open('scaler.pkl', 'rb') as f:
+        scaler = pickle.load(f)
+    print("ШІ-модель LSTM та Scaler успішно завантажені")
+except Exception as e:
+    print(f"Помилка завантаження моделі: {e}")
+    model = None
+
 @app.post("/api/ai/generate_plan/{user_id}", response_model=schemas.PlanResponse)
 def generate_plan(user_id: int, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Гравця не знайдено")
 
-    # ЗАХИСТ ВІД "ХОЛОДНОГО СТАРТУ"
-    if not user.metrics or len(user.metrics) == 0:
-        fallback_plan = models.GeneratedPlan(
+    # Перевірка кількості даних (Потрібно мінімум 7 днів для LSTM)
+    metrics = sorted(user.metrics, key=lambda x: x.date)
+    
+    if len(metrics) < 7:
+        return models.GeneratedPlan(
             user_id=user_id,
             date=date.today(),
             fatigue_risk="Optimal",
-            plan_focus="Калібрування (Ввідне тренування)",
-            plan_content="Система ще не має історії ваших навантажень.\n\nСьогодні виконайте легке тренування (30-40 хв, RPE 4-5) та збережіть його в 'Активність'. Це дозволить алгоритмам почати розрахунок вашого ACWR."
+            plan_focus="Збір даних (Калібрування)",
+            plan_content=f"Для роботи нейромережі LSTM потрібно 7 днів історії. Зараз у вас {len(metrics)}/7 днів.\nПродовжуйте вносити дані!"
         )
-        db.add(fallback_plan)
-        db.commit()
-        db.refresh(fallback_plan)
-        return fallback_plan
 
-    # АНАЛІЗ ДАНИХ (Якщо метрики вже існують)
-    last_metric = sorted(user.metrics, key=lambda x: x.date)[-1]
+    # Підготовка даних для нейромережі
+    # Беруться останні 7 записів
+    last_7_days = metrics[-7:]
     
-    # Логіка визначення втоми
+    # Створюється масив ознак (Сон, RPE, Тривалість)
+    input_features = []
+    for m in last_7_days:
+        input_features.append([m.sleep_hours, m.rpe_score, m.duration_minutes])
+    
+    # Перетворюється у формат NumPy та масштабується (як при тренуванні)
+    input_array = np.array(input_features)
+    scaled_input = scaler.transform(input_array) # Використовується scaler.pkl
+    
+    # Змінюється форма для LSTM: (Зразки=1, Дні=7, Ознаки=3)
+    final_input = scaled_input.reshape(1, 7, 3)
+
+    # Прогноз нейромережі
+    if model:
+        prediction = model.predict(final_input)
+        risk_score = float(prediction[0][0]) # Отримується число від 0 до 1
+    else:
+        risk_score = 0.5 # Заглушка, якщо модель не завантажилась
+
+    # Класифікація ризику
     fatigue_status = "Optimal"
-    if last_metric.sleep_hours < 6 or last_metric.rpe_score >= 8:
+    if risk_score > 0.75:
         fatigue_status = "High Danger"
-    elif last_metric.rpe_score >= 6:
+    elif risk_score > 0.4:
         fatigue_status = "Moderate Risk"
 
-    # Логіка генерації контенту на основі амплуа
+    # 5. Генерація контенту (На основі позиції гравця)
     focus = ""
     content = ""
 
-    if "Danger" in fatigue_status:
-        focus = "Відновлення (Recovery)"
-        content = "Виявлено високий рівень втоми.\n1. МТФ (масажним ролом) - 15 хв.\n2. Статична розтяжка.\n3. Повноцінний сон сьогодні вночі."
+    if fatigue_status == "High Danger":
+        focus = "Повне відновлення"
+        content = f"ШІ оцінив ризик втоми у {int(risk_score*100)}%.\nСьогодні тільки розтяжка та сон. Жодних навантажень!"
     else:
+        # Логіка для PG/SG 
         if user.position in ["PG", "SG"]:
-            focus = "Швидкість та гра на периметрі"
-            content = "1. Динамічна розминка - 10 хв.\n2. Дриблінг на максимальній швидкості - 15 хв.\n3. Кидки після заслону - 100 влучань."
-        elif user.position == "SF":
-            focus = "Універсальність (Wing Skills)"
-            content = "1. Динамічна розминка - 10 хв.\n2. Проходи під кільце з опором - 15 хв.\n3. Кидки Catch and Shoot - 100 влучань."
+            focus = "Швидкість та дриблінг"
+            content = "1. Робота над першим кроком.\n2. Кидки в русі (50 влучань).\n3. Дриблінг з двома м'ячами."
         else:
-            focus = "Гра під кільцем (Post Skills)"
-            content = "1. Динамічна розминка - 10 хв.\n2. Робота на вусах (Post moves) - 20 хв.\n3. Підбирання та добивання - 50 разів."
+            focus = "Загальне тренування"
+            content = "Виконайте стандартний набір вправ для вашої позиції."
 
     new_plan = models.GeneratedPlan(
         user_id=user_id,
