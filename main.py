@@ -10,6 +10,7 @@ from database import engine, SessionLocal
 import tensorflow as tf
 import pickle
 import numpy as np
+import random
 
 # ==========================================
 # 1. ІНІЦІАЛІЗАЦІЯ ТА НАЛАШТУВАННЯ
@@ -287,21 +288,58 @@ def generate_plan(user_id: int, db: Session = Depends(get_db)):
     elif risk_score > 0.4:
         fatigue_status = "Moderate Risk"
 
-    # 5. Генерація контенту (На основі позиції гравця)
+    # Генерація контенту (На основі позиції гравця)
+# 5. ГЕНЕРАЦІЯ КОНТЕНТУ (Повноцінний динамічний конструктор)
     focus = ""
     content = ""
 
     if fatigue_status == "High Danger":
         focus = "Повне відновлення"
-        content = f"ШІ оцінив ризик втоми у {int(risk_score*100)}%.\nСьогодні тільки розтяжка та сон. Жодних навантажень!"
+        content = (
+            f"ШІ зафіксував критичну втому ({int(risk_score*100)}%).\n"
+            "Сьогодні робота тільки над відновленням:\n"
+            "1. Контрастний душ або кріо-процедури.\n"
+            "2. МТФ (масажний рол) - фокус на поперек та ікри.\n"
+            "3. Повноцінний сон (9+ годин) та гідратація."
+        )
+    elif fatigue_status == "Moderate Risk":
+        focus = "Технічна підготовка (Low Intensity)"
+        content = (
+            f"Ризик втоми помірний ({int(risk_score*100)}%). Уникаємо стрибків.\n"
+            "1. Суглобова розминка - 15 хв.\n"
+            "2. Штрафні кидки - 100 спроб.\n"
+            "3. Робота над слабкою рукою (дриблінг на місці) - 15 хв.\n"
+            "4. Розтяжка всього тіла."
+        )
     else:
-        # Логіка для PG/SG 
-        if user.position in ["PG", "SG"]:
-            focus = "Швидкість та дриблінг"
-            content = "1. Робота над першим кроком.\n2. Кидки в русі (50 влучань).\n3. Дриблінг з двома м'ячами."
-        else:
-            focus = "Загальне тренування"
-            content = "Виконайте стандартний набір вправ для вашої позиції."
+        # ЗЕЛЕНА ЗОНА - Генеруємо тренування за амплуа
+        warmups = ["Скакалка (3х3 хв)", "Робота з тенісним м'ячем (реакція)", "Динамічна розминка NBA-style"]
+        
+        # Бібліотека вправ за позиціями
+        drills_library = {
+            "PG": ["Pick-and-roll passing", "Deep range shooting", "Speed dribbling", "Double crossover drills"],
+            "SG": ["Catch and shoot (3pts)", "Coming off screens", "Floater development", "ISO moves"],
+            "SF": ["Slash and kick", "Mid-range fadeaways", "Defensive sliding", "Fast break finishing"],
+            "PF": ["Post-fade moves", "Pick and pop shooting", "Box-out drills", "Face-up drives"],
+            "C": ["Rim protection positioning", "Mikan drill (finishing)", "Drop step moves", "Hook shots"]
+        }
+
+        # Якщо позиція не знайдена, використовуємо загальні вправи
+        position_drills = drills_library.get(user.position, ["Загальний дриблінг", "Кидки з дистанції", "Захисна стійка"])
+        
+        todays_warmup = random.choice(warmups)
+        # Вибираємо 3 унікальні вправи для конкретної позиції
+        selected_drills = random.sample(position_drills, min(len(position_drills), 3))
+        
+        focus = f"Інтенсивний розвиток ({user.position})"
+        content = (
+            f"Прогноз стану: Оптимальний. Рівень ризику: {int(risk_score*100)}%.\n"
+            f"1. {todays_warmup}\n"
+            f"2. {selected_drills[0]}\n"
+            f"3. {selected_drills[1]}\n"
+            f"4. {selected_drills[2]}\n"
+            "5. Високоінтенсивне інтервальне біг (5 хв)."
+        )
 
     new_plan = models.GeneratedPlan(
         user_id=user_id,
