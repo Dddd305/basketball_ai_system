@@ -6,7 +6,11 @@ from sqlalchemy.orm import sessionmaker
 SQLALCHEMY_DATABASE_URL = "postgresql://neondb_owner:npg_h0C9rlEwQFvn@ep-young-lake-alqfuwz1.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require"
 
 # Двигун, який фізично виконує запити до БД
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    pool_pre_ping=True,  # Автоматично перевіряє, чи не "відвалилася" база перед запитом
+    pool_recycle=300     # Примусово оновлює з'єднання кожні 5 хвилин (300 секунд)
+)
 
 # Створення фабрики сесій. Через сесію я буду додавати та читати дані
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
