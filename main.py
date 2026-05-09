@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 import bcrypt
-from datetime import date
+from datetime import date, timedelta
 from typing import List, Optional
 import models
 import schemas
@@ -21,7 +21,7 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Basketball AI System API",
     description="Бекенд з авторизацією та ШІ-плануванням",
-    version="1.2.0"
+    version="1.2.1"
 )
 
 app.add_middleware(
@@ -117,10 +117,8 @@ def calibrate_user(user_id: int, days: List[schemas.CalibrationDay], db: Session
     if not user:
         raise HTTPException(status_code=404, detail="Гравця не знайдено")
 
-    # Перебираємо масив днів, який надіслав фронтенд
     for day_data in days:
         if day_data.trained:
-            # Записуємо тренування
             metric = models.DailyMetric(
                 user_id=user_id,
                 date=day_data.date,
@@ -130,7 +128,6 @@ def calibrate_user(user_id: int, days: List[schemas.CalibrationDay], db: Session
                 activity_type="Баскетбол (Калібрування)"
             )
         else:
-            # Записуємо день відпочинку
             metric = models.DailyMetric(
                 user_id=user_id,
                 date=day_data.date,
@@ -141,7 +138,6 @@ def calibrate_user(user_id: int, days: List[schemas.CalibrationDay], db: Session
             )
         db.add(metric)
 
-    # Зберігаємо всі 7 днів у базу одним комітом
     db.commit()
     db.refresh(user)
     
@@ -153,6 +149,16 @@ def calibrate_user(user_id: int, days: List[schemas.CalibrationDay], db: Session
 
 @app.post("/api/users/{user_id}/metrics", response_model=schemas.MetricResponse)
 def create_metric(user_id: int, metric: schemas.MetricCreate, db: Session = Depends(get_db)):
+    # Перевірка на дублікати: якщо запис за цю дату вже є, видаляємо старий
+    existing_metric = db.query(models.DailyMetric).filter(
+        models.DailyMetric.user_id == user_id,
+        models.DailyMetric.date == metric.date
+    ).first()
+
+    if existing_metric:
+        db.delete(existing_metric)
+        db.commit()
+
     new_metric = models.DailyMetric(**metric.dict(), user_id=user_id)
     db.add(new_metric)
     
@@ -168,22 +174,18 @@ def create_metric(user_id: int, metric: schemas.MetricCreate, db: Session = Depe
 
 @app.post("/api/users/{user_id}/shoes", response_model=schemas.ShoeResponse)
 def add_shoe(user_id: int, shoe: schemas.ShoeCreate, db: Session = Depends(get_db)):
-    # Знаходимо користувача, щоб взяти його вагу
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Гравця не знайдено")
 
-    # 1. Базовий ресурс
     base_hours = 80.0
 
-    # 2. Коефіцієнт ваги (беремо з профілю гравця!)
     weight_coeff = 1.0
     if user.weight_kg < 80:
         weight_coeff = 1.1
     elif user.weight_kg > 95:
         weight_coeff = 0.85
 
-    # 3. Коефіцієнт покриття
     surface_coeff = 1.0
     if shoe.surface_type == "Асфальт":
         surface_coeff = 0.5
@@ -192,22 +194,16 @@ def add_shoe(user_id: int, shoe: schemas.ShoeCreate, db: Session = Depends(get_d
     elif shoe.surface_type == "Гума/Тартан":
         surface_coeff = 0.8
 
-    # 4. Коефіцієнт типу взуття
     type_coeff = 1.0
     if shoe.shoe_type != "Баскетбольні":
         type_coeff = 0.7
 
-    # --- МАТЕМАТИКА ШІ-КАЛЬКУЛЯТОРА ---
     calculated_max_lifespan = base_hours * weight_coeff * surface_coeff * type_coeff
-    
-    # Вираховуємо, скільки годин вже "відіграно", якщо користувач вказав б/в кросівки
     calculated_current_wear = calculated_max_lifespan * (shoe.initial_wear_percentage / 100.0)
 
-    # Створюємо запис у базі
     new_shoe = models.ShoeInventory(
         user_id=user_id,
         brand_model=shoe.brand_model,
-        # Зберігаємо інформацію про тип і покриття замість cushion_type
         cushion_type=f"{shoe.shoe_type} | {shoe.surface_type}", 
         max_lifespan_hours=calculated_max_lifespan,
         current_hours_played=calculated_current_wear
@@ -246,7 +242,6 @@ def generate_plan(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="Гравця не знайдено")
 
-    # Перевірка кількості даних (Потрібно мінімум 7 днів для LSTM)
     metrics = sorted(user.metrics, key=lambda x: x.date)
     
     if len(metrics) < 7:
@@ -258,38 +253,40 @@ def generate_plan(user_id: int, db: Session = Depends(get_db)):
             plan_content=f"Для роботи нейромережі LSTM потрібно 7 днів історії. Зараз у вас {len(metrics)}/7 днів.\nПродовжуйте вносити дані!"
         )
 
-    # Підготовка даних для нейромережі
-    # Беруться останні 7 записів
-    last_7_days = metrics[-7:]
+    # Підготовка часового ряду (захист від розривів у днях)
+    last_date = metrics[-1].date
+    metrics_dict = {m.date: m for m in metrics}
+    last_7_days = []
     
-    # Створюється масив ознак (Сон, RPE, Тривалість)
+    for i in range(6, -1, -1):
+        target_date = last_date - timedelta(days=i)
+        if target_date in metrics_dict:
+            last_7_days.append(metrics_dict[target_date])
+        else:
+            # Пропущений день вважаємо днем відновлення
+            empty_metric = models.DailyMetric(sleep_hours=8.0, rpe_score=0, duration_minutes=0)
+            last_7_days.append(empty_metric)
+
     input_features = []
     for m in last_7_days:
         input_features.append([m.sleep_hours, m.rpe_score, m.duration_minutes])
     
-    # Перетворюється у формат NumPy та масштабується (як при тренуванні)
     input_array = np.array(input_features)
-    scaled_input = scaler.transform(input_array) # Використовується scaler.pkl
-    
-    # Змінюється форма для LSTM: (Зразки=1, Дні=7, Ознаки=3)
+    scaled_input = scaler.transform(input_array)
     final_input = scaled_input.reshape(1, 7, 3)
 
-    # Прогноз нейромережі
     if model:
         prediction = model.predict(final_input)
-        risk_score = float(prediction[0][0]) # Отримується число від 0 до 1
+        risk_score = float(prediction[0][0])
     else:
-        risk_score = 0.5 # Заглушка, якщо модель не завантажилась
+        risk_score = 0.5 
 
-    # Класифікація ризику
     fatigue_status = "Optimal"
     if risk_score > 0.75:
         fatigue_status = "High Danger"
     elif risk_score > 0.4:
         fatigue_status = "Moderate Risk"
 
-    # Генерація контенту (На основі позиції гравця)
-# 5. ГЕНЕРАЦІЯ КОНТЕНТУ (Повноцінний динамічний конструктор)
     focus = ""
     content = ""
 
@@ -312,10 +309,8 @@ def generate_plan(user_id: int, db: Session = Depends(get_db)):
             "4. Розтяжка всього тіла."
         )
     else:
-        # ЗЕЛЕНА ЗОНА - Генеруємо тренування за амплуа
         warmups = ["Скакалка (3х3 хв)", "Робота з тенісним м'ячем (реакція)", "Динамічна розминка NBA-style"]
         
-        # Бібліотека вправ за позиціями
         drills_library = {
             "PG": ["Pick-and-roll passing", "Deep range shooting", "Speed dribbling", "Double crossover drills"],
             "SG": ["Catch and shoot (3pts)", "Coming off screens", "Floater development", "ISO moves"],
@@ -324,11 +319,8 @@ def generate_plan(user_id: int, db: Session = Depends(get_db)):
             "C": ["Rim protection positioning", "Mikan drill (finishing)", "Drop step moves", "Hook shots"]
         }
 
-        # Якщо позиція не знайдена, використовуємо загальні вправи
         position_drills = drills_library.get(user.position, ["Загальний дриблінг", "Кидки з дистанції", "Захисна стійка"])
-        
         todays_warmup = random.choice(warmups)
-        # Вибираємо 3 унікальні вправи для конкретної позиції
         selected_drills = random.sample(position_drills, min(len(position_drills), 3))
         
         focus = f"Інтенсивний розвиток ({user.position})"
