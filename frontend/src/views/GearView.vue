@@ -1,19 +1,14 @@
 <template>
   <div class="view-container">
     <header class="header">
-      <h1 class="header-title">
-        <svg class="title-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"></path>
-          <line x1="16" y1="8" x2="2" y2="22"></line>
-        </svg>
+      <h1 class="header-title" style="display: flex; align-items: center; gap: 8px;">
+        <Archive class="title-icon" :size="28" />
         Інвентар
       </h1>
     </header>
 
     <div v-if="loading" class="loading-state" style="display: flex; align-items: center; justify-content: center; gap: 10px; height: 50vh;">
-      <svg class="animate-spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-      </svg>
+      <Loader2 class="animate-spin" :size="24" color="#ff9800" />
       <p style="margin: 0; color: #b0bec5; font-size: 1.1em;">Завантаження даних з сервера...</p>
     </div>
 
@@ -29,7 +24,6 @@
               type="text" 
               v-model="newShoe.brand_model" 
               required 
-              placeholder="Напр: Nike LeBron 21" 
               class="input-field" 
             />
           </div>
@@ -55,7 +49,7 @@
 
           <div class="calculator-box">
             <div class="calc-header">
-              <span>⚡ Максимальний ресурс (розрахунок ШІ):</span>
+              <span>Максимальний ресурс (розрахунок ШІ):</span>
               <strong class="highlight-text">{{ calculatedMaxLifespan }} год</strong>
             </div>
             <p class="calc-hint">Враховано вашу вагу ({{ user.weight_kg }} кг), тип взуття та покриття.</p>
@@ -126,7 +120,7 @@
           </progress>
           
           <p v-if="shoe.current_hours_played >= shoe.max_lifespan_hours" class="warning-text">
-            ⚠️ Ресурс вичерпано. Високий ризик травми.
+            Ресурс вичерпано. Високий ризик травми.
           </p>
         </div>
         
@@ -141,6 +135,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { Archive, Loader2, Trash2 } from 'lucide-vue-next'
 
 const currentUserId = localStorage.getItem('userId')
 const user = ref(null)
@@ -193,7 +188,7 @@ const fetchUser = async () => {
   // 1. Дістаємо з кешу (спільного з Дашбордом!)
   const cachedData = localStorage.getItem(`user_data_${currentUserId}`)
   if (cachedData) {
-    console.log('📦 Інвентар: Дані завантажено з кешу')
+    console.log('Інвентар: Дані завантажено з кешу')
     user.value = JSON.parse(cachedData)
   }
 
@@ -208,7 +203,7 @@ const fetchUser = async () => {
       
       // 3. Зберігаємо оновлені дані
       localStorage.setItem(`user_data_${currentUserId}`, JSON.stringify(freshUser))
-      console.log('☁️ Інвентар: Дані оновлено з сервера')
+      console.log('Інвентар: Дані оновлено з сервера')
     } catch (error) {
       console.error('Помилка оновлення інвентарю:', error)
     }

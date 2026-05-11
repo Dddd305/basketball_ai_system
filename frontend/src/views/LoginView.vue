@@ -2,10 +2,8 @@
   <div class="login-container">
     <div class="login-card">
       
-      <div class="logo-container">
-        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>
-        </svg>
+      <div class="logo-container" style="display: flex; justify-content: center; margin-bottom: 15px;">
+        <Dribbble :size="64" color="#ff9800" stroke-width="1.5" />
       </div>
       
       <h1 class="login-title">З поверненням!</h1>
@@ -16,11 +14,7 @@
         @click.prevent="installPWA" 
         class="install-pwa-btn"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-          <polyline points="7 10 12 15 17 10"></polyline>
-          <line x1="12" y1="15" x2="12" y2="3"></line>
-        </svg>
+        <Download :size="20" style="margin-right: 8px;" />
         Встановити на головний екран
       </button>
 
@@ -32,24 +26,37 @@
             type="email" 
             v-model="credentials.email" 
             required 
-            placeholder="player@gmail.com" 
             class="input-field" 
           />
         </div>
 
         <div class="form-group">
           <label>Пароль</label>
-          <input 
-            type="password" 
-            v-model="credentials.password" 
-            required 
-            placeholder="••••••••" 
-            class="input-field" 
-          />
+          <div style="position: relative; display: flex; align-items: center;">
+            <input 
+              :type="showPassword ? 'text' : 'password'" 
+              v-model="credentials.password" 
+              required 
+              class="input-field" 
+              style="width: 100%; padding-right: 40px; box-sizing: border-box;"
+            />
+            <button 
+              type="button" 
+              @click="togglePassword" 
+              style="position: absolute; right: 10px; background: none; border: none; color: #b0bec5; cursor: pointer; padding: 0; display: flex; align-items: center;"
+            >
+              <EyeOff v-if="showPassword" :size="20" />
+              <Eye v-else :size="20" />
+            </button>
+          </div>
         </div>
 
         <button type="submit" :disabled="isLoading" class="btn-primary">
-          {{ isLoading ? 'Перевірка...' : 'Увійти' }}
+          <span v-if="isLoading">
+            <Loader2 class="animate-spin" :size="18" style="vertical-align: middle; margin-right: 5px;" />
+            Перевірка...
+          </span>
+          <span v-else>Увійти</span>
         </button>
       </form>
 
@@ -67,13 +74,20 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue' // ДОДАНО: onMounted та onUnmounted
+import { ref, onMounted } from 'vue' 
 import { useRouter } from 'vue-router'
+import { Dribbble, Eye, EyeOff, Loader2, Download } from 'lucide-vue-next'
 
 const router = useRouter()
 const credentials = ref({ email: '', password: '' })
 const errorMessage = ref('')
 const isLoading = ref(false)
+
+// Логіка видимості пароля
+const showPassword = ref(false)
+const togglePassword = () => {
+  showPassword.value = !showPassword.value
+}
 
 // ==========================================
 // --- ЛОГІКА ВСТАНОВЛЕННЯ PWA ---
@@ -102,15 +116,13 @@ const installPWA = async () => {
 }
 
 onMounted(() => {
-  // ДОДАНО: Авто-вхід для PWA
   const savedUserId = localStorage.getItem('userId')
   if (savedUserId) {
     console.log('Знайдено активну сесію. Автоматичний вхід...')
     router.push('/dashboard')
-    return // Зупиняємо виконання подальшого коду
+    return 
   }
 
-  // Твій існуючий код для кнопки PWA
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
 })
 // ==========================================
@@ -119,28 +131,22 @@ const login = async () => {
   isLoading.value = true
   errorMessage.value = ''
 
-  // ==========================================
-  // ДОДАНО: РОЗУМНИЙ ОФЛАЙН-ЛОГІН
-  // ==========================================
+  // РОЗУМНИЙ ОФЛАЙН-ЛОГІН
   if (!navigator.onLine) {
-    // 1. Перевіряємо, чи є в пам'яті збережений ID користувача
     const savedUserId = localStorage.getItem('userId')
 
     if (savedUserId) {
-      // 2. Якщо ID є, імітуємо успішний логін і пускаємо на Дашборд
-      console.log('🌐 Офлайн режим: Знайдено збережену сесію.')
+      console.log('Офлайн режим: Знайдено збережену сесію.')
       router.push('/dashboard')
     } else {
-      // 3. Якщо ID немає (взагалі перший вхід на цьому пристрої)
       errorMessage.value = 'Немає підключення. Для першого входу потрібен Інтернет.'
     }
     
     isLoading.value = false
-    return // Зупиняємо функцію, щоб не робити запит на сервер!
+    return 
   }
-  // ==========================================
 
-  // --- Стандартний логін (якщо Інтернет Є) ---
+  // Стандартний логін
   try {
     const response = await fetch('https://basketball-api-kyiv.onrender.com/api/users/login', {
       method: 'POST',
@@ -151,19 +157,17 @@ const login = async () => {
     const data = await response.json()
 
     if (response.ok) {
-      // Успішний вхід: зберігаємо ID у пам'ять для майбутніх офлайн-сесій
       localStorage.setItem('userId', data.user_id)
       router.push('/dashboard')
     } else {
       errorMessage.value = data.detail || 'Помилка авторизації'
     }
   } catch (error) {
-    // 🛡 ПІДСТРАХОВКА: Якщо fetch впав через мережу (навіть якщо navigator.onLine брехав)
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
       const savedUserId = localStorage.getItem('userId')
       
       if (savedUserId) {
-        console.log('🌐 Збій мережі: Переходимо в офлайн режим за збереженою сесією.')
+        console.log('Збій мережі: Переходимо в офлайн режим.')
         router.push('/dashboard')
         return
       } else {
@@ -172,7 +176,6 @@ const login = async () => {
       }
     }
     
-    // Якщо помилка не пов'язана з інтернетом
     errorMessage.value = 'Помилка підключення до сервера'
   } finally {
     isLoading.value = false

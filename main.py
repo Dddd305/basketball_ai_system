@@ -118,14 +118,14 @@ def calibrate_user(user_id: int, days: List[schemas.CalibrationDay], db: Session
         raise HTTPException(status_code=404, detail="Гравця не знайдено")
 
     for day_data in days:
-        if day_data.trained:
+        if day_data.activity_type != "Recovery":
             metric = models.DailyMetric(
                 user_id=user_id,
                 date=day_data.date,
                 sleep_hours=day_data.sleep_hours,
                 duration_minutes=day_data.duration_minutes,
                 rpe_score=day_data.rpe_score,
-                activity_type="Баскетбол (Калібрування)"
+                activity_type=day_data.activity_type
             )
         else:
             metric = models.DailyMetric(
@@ -134,7 +134,7 @@ def calibrate_user(user_id: int, days: List[schemas.CalibrationDay], db: Session
                 sleep_hours=day_data.sleep_hours,
                 duration_minutes=0,
                 rpe_score=0,
-                activity_type="Відновлення"
+                activity_type="Recovery"
             )
         db.add(metric)
 
@@ -263,13 +263,19 @@ def generate_plan(user_id: int, db: Session = Depends(get_db)):
         if target_date in metrics_dict:
             last_7_days.append(metrics_dict[target_date])
         else:
-            # Пропущений день вважаємо днем відновлення
-            empty_metric = models.DailyMetric(sleep_hours=8.0, rpe_score=0, duration_minutes=0)
+            # Пропущений день вважається днем відновлення
+            empty_metric = models.DailyMetric(sleep_hours=8.0, rpe_score=0, duration_minutes=0, activity_type="Recovery")
             last_7_days.append(empty_metric)
 
     input_features = []
     for m in last_7_days:
-        input_features.append([m.sleep_hours, m.rpe_score, m.duration_minutes])
+        # Коефіцієнт змагального стресу: +25% до навантаження, якщо це Гра
+        game_multiplier = 1.25 if m.activity_type == "Game" else 1.0
+        
+        effective_rpe = min(10.0, m.rpe_score * game_multiplier)
+        effective_duration = m.duration_minutes * game_multiplier
+        
+        input_features.append([m.sleep_hours, effective_rpe, effective_duration])
     
     input_array = np.array(input_features)
     scaled_input = scaler.transform(input_array)

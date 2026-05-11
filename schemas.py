@@ -26,11 +26,11 @@ class UserLogin(BaseModel):
     
 class CalibrationDay(BaseModel):
     date: dt.date = Field(..., description="Дата тренування/відпочинку")
-    trained: bool = Field(..., description="Чи було тренування в цей день")
+    activity_type: str = Field(..., description="Тип активності: Training, Game або Recovery")
     duration_minutes: int = Field(0, description="Тривалість у хвилинах")
     rpe_score: int = Field(0, description="Інтенсивність RPE (1-10)")
-    sleep_hours: float = Field(..., description="Сон цієї ночі")    
-
+    sleep_hours: float = Field(..., description="Сон цієї ночі")
+    
 # Схема для оновлення даних
 class UserUpdate(BaseModel):
     name: Optional[str] = Field(None, example="Dmytro")
@@ -66,7 +66,6 @@ class ShoeResponse(BaseModel):
 
 
 # Схеми щоденних метрик(тренувань)
-
 class MetricCreate(BaseModel):
     date: dt.date = Field(..., description="Дата тренування")
     sleep_hours: float = Field(..., ge=0, le=24, description="Години сну")

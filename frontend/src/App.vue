@@ -3,16 +3,8 @@
     
     <transition name="slide-down">
       <div v-if="isOffline" class="offline-banner">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="1" y1="1" x2="23" y2="23"></line>
-          <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
-          <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
-          <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
-          <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
-          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
-          <line x1="12" y1="20" x2="12.01" y2="20"></line>
-        </svg>
-        <span>Офлайн: доступний тільки перегляд</span>
+        <WifiOff :size="16" stroke-width="2.5" />
+        <span>Офлайн: режим перегляду</span>
       </div>
     </transition>
 
@@ -27,23 +19,17 @@
     <nav v-if="!hideBottomNav" class="bottom-nav">
       
       <router-link to="/dashboard" class="nav-item" active-class="active">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>
-        </svg>
+        <LayoutDashboard :size="24" />
         <span>Головна</span>
       </router-link>
 
       <router-link to="/activity" class="nav-item" active-class="active">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-        </svg>
+        <Activity :size="24" />
         <span>Активність</span>
       </router-link>
 
       <router-link to="/gear" class="nav-item" active-class="active">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"></path><line x1="16" y1="8" x2="2" y2="22"></line><line x1="17.5" y1="15" x2="9" y2="6.5"></line>
-        </svg>
+        <Archive :size="24" />
         <span>Інвентар</span>
       </router-link>
 
@@ -54,6 +40,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue' // Додано хуки
 import { useRoute } from 'vue-router'
+import { WifiOff, LayoutDashboard, Activity, Archive } from 'lucide-vue-next'
 
 const route = useRoute()
 

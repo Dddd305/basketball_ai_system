@@ -1,25 +1,24 @@
 <template>
   <div class="view-container">
     <header class="header">
-      <h1 style="display: flex; align-items: center;">
-        <svg class="title-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-        </svg>
+      <h1 class="page-title">
+        <Activity class="title-icon" :size="28" />
         Активність
       </h1>
     </header>
 
-    <div v-if="loading" class="loading-state" style="display: flex; align-items: center; justify-content: center; gap: 10px; height: 50vh;">
-      <svg class="animate-spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-      </svg>
-      <p style="margin: 0; color: #b0bec5; font-size: 1.1em;">Завантаження даних з сервера...</p>
+    <div v-if="loading" class="loading-state">
+      <Loader2 class="animate-spin" :size="24" color="#ff9800" />
+      <p>Завантаження даних з сервера...</p>
     </div>
 
-    <div v-else-if="user">
+    <div v-else-if="user" class="content-wrapper">
       
       <div class="card form-card">
-        <h2 class="form-title">Додати активність</h2>
+        <h2 class="form-title">
+          <PlusCircle class="title-icon" :size="22" />
+          Додати активність
+        </h2>
         <form @submit.prevent="submitMetric" class="training-form">
           <div class="form-row">
             <div class="form-group">
@@ -47,14 +46,14 @@
             </div>
           </div>
 
-          <div class="form-row" style="display: flex; gap: 15px; flex-wrap: wrap;">
-            <div class="form-group" style="flex: 1;">
+          <div class="form-row">
+            <div class="form-group">
               <label>Сон (годин):</label>
               <input type="number" v-model="newMetric.sleep_hours" step="0.5" min="0" max="24" required class="input-field" />
             </div>
-            <div class="form-group" style="flex: 1;">
+            <div class="form-group">
               <label>HRV (мс, необов'язково):</label>
-              <input type="number" v-model="newMetric.hrv_value" step="0.1" placeholder="Напр: 65" class="input-field" />
+              <input type="number" v-model="newMetric.hrv_value" step="0.1" class="input-field" />
             </div>
           </div>
 
@@ -62,62 +61,70 @@
             <label>Кросівки (необов'язково):</label>
             <select v-model="newMetric.shoe_id" class="input-field">
               <option :value="null">Без кросівок / Інше</option>
-              <option v-for="shoe in user.shoes" :key="shoe.shoe_id" :value="shoe.shoe_id">
+              <option v-for="shoe in user?.shoes || []" :key="shoe.shoe_id" :value="shoe.shoe_id">
                 {{ shoe.brand_model }} (Знос: {{ shoe.current_hours_played.toFixed(1) }} год)
               </option>
             </select>
           </div>
 
           <button type="submit" :disabled="isSubmitting" class="btn-primary">
-            {{ isSubmitting ? 'Зберігаю...' : 'Зберегти' }}
+            <Loader2 v-if="isSubmitting" class="animate-spin" :size="18" />
+            <span>{{ isSubmitting ? 'Зберігаю...' : 'Зберегти' }}</span>
           </button>
           
-          <p v-if="successMessage" class="success-message" style="display: flex; align-items: center; gap: 10px; background: rgba(76, 175, 80, 0.1); color: #4caf50; padding: 12px 16px; border-radius: 8px; border: 1px solid rgba(76, 175, 80, 0.2); margin-bottom: 20px; font-weight: 500;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-          <path d="m9 11 3 3L22 4"></path>
-          </svg>
-          {{ successMessage }}
-          </p>
+          <transition name="fade">
+            <div v-if="successMessage" class="alert-success">
+              <CheckCircle :size="20" />
+              <span>{{ successMessage }}</span>
+            </div>
+          </transition>
         </form>
       </div>
 
       <div class="card">
-        <h2 class="section-title">Історія навантажень</h2>
-        <div style="position: relative; height: 250px; width: 100%;">
+        <h2 class="section-title">
+          <BarChart3 class="title-icon" :size="24" />
+          Історія навантажень
+        </h2>
+        <div class="chart-wrapper">
           <canvas ref="chartCanvas"></canvas>
         </div>
-        <p v-if="!user.metrics || user.metrics.length === 0" class="empty-text">
+        <p v-if="!hasMetrics" class="empty-text">
           Немає даних про тренування для побудови графіка.
         </p>
       </div>
 
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; margin-bottom: 10px;">
-        <h2 class="section-title" style="margin: 0;">Щоденник</h2>
-        <button @click="exportToCSV" class="btn-primary" style="padding: 6px 12px; font-size: 0.85em; margin-top: 0;">
+      <div class="logbook-header">
+        <h2 class="section-title" style="margin-top: 0;">
+          <History class="title-icon" :size="24" />
+          Щоденник тренувань
+        </h2>
+        <button @click="exportToCSV" class="btn-primary export-btn">
+          <Download :size="16" />
           Експорт CSV
         </button>
       </div>
 
-      <div class="card" style="max-height: 300px; overflow-y: auto; padding: 0;">
-        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9em;">
-          <thead style="background: #1e1e1e; z-index: 1;">
-            <tr style="border-bottom: 2px solid #333;">
-              <th style="padding: 12px; color: #b0bec5;">Дата</th>
-              <th style="padding: 12px; color: #b0bec5;">Тип</th>
-              <th style="padding: 12px; color: #b0bec5;">Навантаження</th>
+      <div class="card table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Тип</th>
+              <th>Навантаження</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="metric in [...(user.metrics || [])].sort((a, b) => new Date(b.date) - new Date(a.date))" :key="metric.metric_id" style="border-bottom: 1px solid #333;">
-              <td style="padding: 12px;">{{ metric.date.substring(5) }}</td>
-              <td style="padding: 12px;">
-                <span v-if="metric.activity_type === 'Recovery'" style="color: #4caf50; font-weight: bold;">Відновлення</span>
-                <span v-else>{{ metric.activity_type === 'Training' ? 'Трен.' : 'Гра' }}</span>
+            <tr v-for="metric in sortedMetrics" :key="metric.metric_id">
+              <td>{{ metric.date.substring(5) }}</td>
+              <td>
+                <span :class="['badge', metric.activity_type.toLowerCase()]">
+                  {{ translateActivity(metric.activity_type) }}
+                </span>
               </td>
-              <td style="padding: 12px;">
+              <td>
                 <span v-if="metric.activity_type !== 'Recovery'">{{ metric.duration_minutes }}хв (RPE {{ metric.rpe_score }})</span>
-                <span v-else style="color: #b0bec5;">—</span>
+                <span v-else class="text-muted">—</span>
               </td>
             </tr>
           </tbody>
@@ -129,9 +136,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import Chart from 'chart.js/auto'
+import { Activity, Loader2, PlusCircle, BarChart3, History, Download, CheckCircle } from 'lucide-vue-next'
 
+const router = useRouter()
 const currentUserId = localStorage.getItem('userId')
 const user = ref(null)
 const loading = ref(true)
@@ -151,22 +161,29 @@ const newMetric = ref({
   shoe_id: null
 })
 
-// ==========================================
-// --- МЕРЕЖЕВІ ЗАПИТИ (OFFLINE-FIRST) ---
-// ==========================================
+// --- ОБЧИСЛЮВАЛЬНІ ВЛАСТИВОСТІ ---
+const hasMetrics = computed(() => user.value?.metrics && user.value.metrics.length > 0)
+const sortedMetrics = computed(() => {
+  if (!hasMetrics.value) return []
+  return [...user.value.metrics].sort((a, b) => new Date(b.date) - new Date(a.date))
+})
+
+/**
+ * @function fetchUser
+ * @description Асинхронно завантажує профіль користувача та його метрики.
+ * Використовує архітектуру "Offline-First": спочатку віддає дані з localStorage, 
+ * а потім фоново синхронізує їх з віддаленим сервером.
+ * @returns {Promise<void>}
+ */
 const fetchUser = async () => {
   loading.value = true
 
-  // 1. Миттєве завантаження з кешу
   const cachedData = localStorage.getItem(`user_data_${currentUserId}`)
   if (cachedData) {
-    console.log('📦 Активність: Дані завантажено з кешу')
     user.value = JSON.parse(cachedData)
-    // Малюємо графік одразу з кешованих даних
-    setTimeout(() => { renderChart() }, 150)
+    setTimeout(() => renderChart(), 150)
   }
 
-  // 2. Оновлення з сервера у фоновому режимі
   if (navigator.onLine) {
     try {
       const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}`) 
@@ -175,33 +192,37 @@ const fetchUser = async () => {
       const freshUser = await response.json()
       user.value = freshUser
       
-      // Зберігаємо свіжі дані
       localStorage.setItem(`user_data_${currentUserId}`, JSON.stringify(freshUser))
-      console.log('☁️ Активність: Дані оновлено з сервера')
-      
-      // Перемальовуємо графік новими даними
-      setTimeout(() => { renderChart() }, 150)
-      
+      setTimeout(() => renderChart(), 150)
     } catch (error) {
-      console.error('Помилка оновлення з сервера:', error)
+      console.error('Помилка синхронізації з сервером:', error)
     }
-  } else if (!cachedData) {
-    console.error('Немає підключення і немає збережених даних :(')
   }
 
   loading.value = false
 }
 
+/**
+ * @function renderChart
+ * @description Відмальовує гістограму навантажень за останні 7 днів за допомогою Chart.js.
+ * Враховує коефіцієнт ігрового амплуа (posCoeff) та змагального стресу (Game = 1.25).
+ * Попередньо очищує старий інстанс графіка для запобігання витоку пам'яті.
+ */
 const renderChart = () => {
-  if (!user.value || !user.value.metrics || user.value.metrics.length === 0) return
+  if (!hasMetrics.value || !chartCanvas.value) return
   
   const ctx = chartCanvas.value
-  if (!ctx) return
+  const recentMetrics = sortedMetrics.value.slice(0, 7).reverse() 
 
-  const sortedMetrics = [...user.value.metrics].sort((a, b) => new Date(a.date) - new Date(b.date))
-  const recentMetrics = sortedMetrics.slice(-7)
   const labels = recentMetrics.map(m => m.date.substring(5)) 
-  const data = recentMetrics.map(m => m.duration_minutes * m.rpe_score) 
+  const posCoeff = (user.value.position === 'PG' || user.value.position === 'SG') ? 1.2 : 1.5;
+  
+  const data = recentMetrics.map(m => {
+    if (m.activity_type === 'Recovery') return 0;
+    const typeCoeff = m.activity_type === 'Game' ? 1.25 : 1.0;
+    return Math.round(m.duration_minutes * m.rpe_score * posCoeff * typeCoeff);
+  });
+
   const colors = data.map(value => value > 800 ? '#e65100' : '#ff9800')
 
   if (chartInstance) chartInstance.destroy()
@@ -210,38 +231,33 @@ const renderChart = () => {
     type: 'bar',
     data: {
       labels: labels,
-      datasets: [
-        { 
-          label: 'Навантаження', 
-          data: data, 
-          backgroundColor: colors, 
-          borderRadius: 4 
-        }
-      ]
+      datasets: [{ 
+        label: 'Навантаження', 
+        data: data, 
+        backgroundColor: colors, 
+        borderRadius: 4 
+      }]
     },
     options: {
       responsive: true, 
       maintainAspectRatio: false,
       scales: {
-        y: { 
-          beginAtZero: true, 
-          ticks: { color: '#b0bec5' }, 
-          grid: { color: '#333333' } 
-        },
-        x: { 
-          ticks: { color: '#b0bec5' }, 
-          grid: { display: false } 
-        }
+        y: { beginAtZero: true, ticks: { color: '#b0bec5' }, grid: { color: '#333333' } },
+        x: { ticks: { color: '#b0bec5' }, grid: { display: false } }
       },
-      plugins: { 
-        legend: { display: false } 
-      }
+      plugins: { legend: { display: false } }
     }
   })
 }
 
+/**
+ * @function submitMetric
+ * @description Обробляє відправку форми нового тренування. 
+ * Включає валідацію на наявність інтернет-з'єднання.
+ * У разі успіху автоматично тригерить оновлення локального стану та графіка.
+ * @throws {Error} Якщо сервер повертає статус помилки.
+ */
 const submitMetric = async () => {
-  // 🛡 ЗАХИСТ ОФЛАЙНУ: Перевірка перед відправкою
   if (!navigator.onLine) {
     alert('Відсутнє підключення до Інтернету. Збереження нового тренування наразі недоступне.')
     return
@@ -267,7 +283,19 @@ const submitMetric = async () => {
     if (!response.ok) throw new Error('Помилка')
     
     successMessage.value = 'Збережено!'
-    await fetchUser() // Це автоматично оновить графік і перезапише кеш
+    await fetchUser() 
+    
+    // Скидання форми (Form Reset)
+    newMetric.value = {
+      date: new Date().toISOString().split('T')[0],
+      activity_type: 'Training',
+      duration_minutes: 60,
+      rpe_score: 5,
+      hrv_value: null,
+      sleep_hours: 8,
+      shoe_id: null
+    }
+
     setTimeout(() => { successMessage.value = '' }, 3000)
     
   } catch (error) {
@@ -277,9 +305,13 @@ const submitMetric = async () => {
   }
 }
 
+/**
+ * @function exportToCSV
+ * @description Генерує CSV-файл на льоту з масиву метрик користувача та 
+ * ініціює його завантаження через тимчасовий DOM-елемент <a>.
+ */
 const exportToCSV = () => {
-  // Ця функція ПРАЦЮВАТИМЕ В ОФЛАЙНІ завдяки нашому кешу!
-  if (!user.value || !user.value.metrics || user.value.metrics.length === 0) {
+  if (!hasMetrics.value) {
     return alert('Немає даних!');
   }
   
@@ -310,7 +342,22 @@ const exportToCSV = () => {
   document.body.removeChild(link);
 }
 
-onMounted(() => fetchUser())
+const translateActivity = (type) => {
+  const dict = { 'Training': 'Тренування', 'Game': 'Гра', 'Recovery': 'Відновлення' }
+  return dict[type] || type
+}
+
+onMounted(() => {
+  if (!currentUserId) {
+    router.push('/')
+    return
+  }
+  fetchUser()
+})
+
+onUnmounted(() => {
+  if (chartInstance) chartInstance.destroy()
+})
 </script>
 
 <style scoped>
@@ -326,9 +373,12 @@ onMounted(() => fetchUser())
   margin-bottom: 20px; 
 }
 
-.header h1 { 
+.page-title { 
   margin: 0; 
   font-size: 1.5em; 
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .title-icon { 
@@ -346,10 +396,24 @@ onMounted(() => fetchUser())
 
 .form-title, 
 .section-title { 
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 1.2em; 
   margin-top: 0; 
   color: #fff; 
   margin-bottom: 15px;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 40vh;
+  color: #b0bec5;
+  font-size: 1.1em;
 }
 
 .training-form { 
@@ -361,6 +425,7 @@ onMounted(() => fetchUser())
 .form-row { 
   display: flex; 
   gap: 15px; 
+  flex-wrap: wrap; 
 }
 
 .form-group { 
@@ -368,6 +433,7 @@ onMounted(() => fetchUser())
   display: flex; 
   flex-direction: column; 
   gap: 5px; 
+  min-width: 150px; 
 }
 
 .form-group label { 
@@ -399,19 +465,38 @@ onMounted(() => fetchUser())
   cursor: pointer; 
   font-weight: bold; 
   margin-top: 5px; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .btn-primary:disabled { 
   opacity: 0.7; 
 }
 
-.success-message { 
+.export-btn {
+  padding: 8px 15px;
+  font-size: 0.9em;
+  height: auto;
+}
+
+.alert-success { 
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: #4caf50; 
-  text-align: center; 
   background: rgba(76, 175, 80, 0.1); 
-  padding: 10px; 
-  border-radius: 4px; 
-  border: 1px solid rgba(76, 175, 80, 0.3); 
+  padding: 12px 16px; 
+  border-radius: 8px; 
+  border: 1px solid rgba(76, 175, 80, 0.2); 
+  font-weight: 500;
+}
+
+.chart-wrapper {
+  position: relative;
+  height: 250px;
+  width: 100%;
 }
 
 .empty-text { 
@@ -420,10 +505,78 @@ onMounted(() => fetchUser())
   padding: 15px 0; 
 }
 
+.logbook-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+.table-container {
+  padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9em;
+}
+
+.data-table thead {
+  background: #1e1e1e;
+  z-index: 1;
+  position: sticky;
+  top: 0;
+}
+
+.data-table th {
+  padding: 12px;
+  color: #b0bec5;
+  border-bottom: 2px solid #333;
+}
+
+.data-table td {
+  padding: 12px;
+  border-bottom: 1px solid #333;
+}
+
+.badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.9em;
+}
+
+.badge.recovery { color: #4caf50; }
+.badge.training { color: #fff; }
+.badge.game { color: #ff9800; }
+.text-muted { color: #b0bec5; }
+
 .animate-spin {
   animation: spin 1s linear infinite;
 }
+
 @keyframes spin {
   100% { transform: rotate(360deg); }
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    flex-direction: column;
+    gap: 10px;
+  }
 }
 </style>

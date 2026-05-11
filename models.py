@@ -15,7 +15,7 @@ class User(Base):
     weight_kg = Column(Float)
     position = Column(String)  # Ігрове амплуа (PG, SG, SF, PF, C)
 
-    # Вказую зв'язки (один гравець має багато метрик, кросівок і планів)
+    # Вказуються зв'язки (один гравець має багато метрик, кросівок і планів)
     metrics = relationship("DailyMetric", back_populates="owner", lazy="selectin")
     shoes = relationship("ShoeInventory", back_populates="owner", lazy="selectin")
     plans = relationship("GeneratedPlan", back_populates="owner", lazy="selectin")
@@ -27,7 +27,6 @@ class DailyMetric(Base):
     metric_id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.user_id"))
     
-    # НОВЕ: Зв'язок з таблицею shoes_inventory (SET NULL при видаленні кросівок)
     shoe_id = Column(Integer, ForeignKey("shoes_inventory.shoe_id", ondelete="SET NULL"), nullable=True)
 
     date = Column(Date)
@@ -38,7 +37,6 @@ class DailyMetric(Base):
     sleep_hours = Column(Float)
 
     owner = relationship("User", back_populates="metrics")
-    # НОВЕ: Зв'язок із класом ShoeInventory
     shoe = relationship("ShoeInventory", back_populates="metrics")
 
 
@@ -54,7 +52,6 @@ class ShoeInventory(Base):
     max_lifespan_hours = Column(Float)
 
     owner = relationship("User", back_populates="shoes")
-    # НОВЕ: Зворотний зв'язок до DailyMetric
     metrics = relationship("DailyMetric", back_populates="shoe")
 
 # Таблиця 4: Згенеровані ШІ тренувальні плани

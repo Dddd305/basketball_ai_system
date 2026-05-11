@@ -2,20 +2,15 @@
   <div class="view-container">
     
     <header class="header">
-      <h1 class="header-title">
-        <svg class="title-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-          <circle cx="12" cy="7" r="4"></circle>
-        </svg>
+      <h1 class="header-title" style="display: flex; align-items: center; gap: 8px;">
+        <User class="title-icon" :size="28" />
         Головна панель
       </h1>
       <button @click="logout" class="btn-outline">Вийти</button>
     </header>
     
     <div v-if="loading" class="loading-state" style="display: flex; align-items: center; justify-content: center; gap: 10px; height: 50vh;">
-      <svg class="animate-spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-      </svg>
+      <Loader2 class="animate-spin" :size="24" color="#ff9800" />
       <p style="margin: 0; color: #b0bec5; font-size: 1.1em;">Завантаження даних з сервера...</p>
     </div>
     
@@ -24,10 +19,7 @@
       <div v-if="showCalibrationModal" class="modal-overlay">
         <div class="modal-card modal-large">
           <div class="modal-icon" style="display: flex; justify-content: center; margin-bottom: 15px; color: #ff9800;">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
+            <Settings :size="48" />
           </div>
           <h2 class="modal-title">Налаштування профілю</h2>
           
@@ -55,7 +47,7 @@
               <div class="form-group">
                 <label>Скільки в середньому ви спите? (годин)</label>
                 <div class="slider-container">
-                  <input type="range" v-model.number="calibrationForm.sleep_hours" min="4" max="12" step="0.5" class="range-slider" />
+                  <input type="range" v-model.number="calibrationForm.sleep_hours" min="4" max="24" step="0.5" class="range-slider" />
                   <span class="slider-value">{{ calibrationForm.sleep_hours }} год</span>
                 </div>
               </div>
@@ -68,17 +60,21 @@
             <p class="modal-subtitle">Крок 2/2: Перевірте та відредагуйте точні дані.</p>
             
             <div class="draft-list">
-              <div v-for="(day, index) in draftDays" :key="index" class="draft-day-card" :class="{'active-day': day.trained}">
+              <div v-for="(day, index) in draftDays" :key="index" class="draft-day-card" :class="{'active-day': day.activity_type !== 'Recovery'}">
                 <div class="day-header">
                   <strong>{{ formatDate(day.date) }}</strong>
-                  <label class="toggle-switch">
-                    <input type="checkbox" v-model="day.trained" />
-                    <span class="toggle-slider"></span>
-                    <span class="toggle-label">{{ day.trained ? 'Тренування' : 'Відпочинок' }}</span>
-                  </label>
+                  <select 
+                    v-model="day.activity_type" 
+                    :class="['input-field', 'badge', day.activity_type.toLowerCase()]" 
+                    style="width: auto; padding: 4px 8px; cursor: pointer; border: none; outline: none; text-align: center;"
+                  >
+                    <option value="Training" style="background: #121212; color: #fff;">Тренування</option>
+                    <option value="Game" style="background: #121212; color: #ff9800;">Гра</option>
+                    <option value="Recovery" style="background: #121212; color: #4caf50;">Відпочинок</option>
+                  </select>
                 </div>
                 
-                <div v-if="day.trained" class="day-details">
+                <div v-if="day.activity_type !== 'Recovery'" class="day-details">
                   <div class="mini-group">
                     <label>Хвилин:</label>
                     <input type="number" v-model.number="day.duration_minutes" min="10" class="input-field mini-input" />
@@ -106,9 +102,7 @@
         <div class="card-header" style="display: flex; justify-content: space-between; margin-bottom: 15px;">
           <h3 style="margin: 0; font-size: 1.1em; color: #b0bec5;">Мій профіль</h3>
           <button v-if="!isEditing" @click="startEditing" class="btn-text" style="display: flex; align-items: center; gap: 5px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-            </svg>
+            <Edit2 :size="16" />
             Редагувати
           </button>
           <div v-else class="edit-actions">
@@ -172,11 +166,7 @@
           <div style="display: flex; justify-content: center; align-items: center; gap: 10px;">
             <p class="label" title="Acute:Chronic Workload Ratio" style="margin: 0;">Коефіцієнт ACWR</p>
             <span v-if="isAcwrCalibrating" title="Збір повноцінної хронічної бази (28 днів)" style="display: flex; align-items: center; background: rgba(255, 152, 0, 0.15); color: #ff9800; font-size: 0.65em; padding: 3px 6px; border-radius: 4px; border: 1px solid rgba(255, 152, 0, 0.5); text-transform: uppercase; font-weight: bold;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
-                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
-                <path d="M12 9v4"></path>
-                <path d="M12 17h.01"></path>
-              </svg>
+              <AlertTriangle :size="12" style="margin-right: 4px;" />
               {{ daysInSystem }}/28 дн.
             </span>
           </div>
@@ -210,29 +200,22 @@
 
       <div class="ai-card">
         <div class="ai-header">
-          <h2 style="display: flex; align-items: center;">
-            <svg class="title-icon" style="color: var(--primary); margin-right: 10px;" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
-              <rect x="9" y="9" width="6" height="6"></rect>
-              <line x1="9" y1="1" x2="9" y2="4"></line>
-              <line x1="15" y1="1" x2="15" y2="4"></line>
-              <line x1="9" y1="20" x2="9" y2="23"></line>
-              <line x1="15" y1="20" x2="15" y2="23"></line>
-              <line x1="20" y1="9" x2="23" y2="9"></line>
-              <line x1="20" y1="14" x2="23" y2="14"></line>
-              <line x1="1" y1="9" x2="4" y2="9"></line>
-              <line x1="1" y1="14" x2="4" y2="14"></line>
-            </svg>
+          <h2 style="display: flex; align-items: center; gap: 10px;">
+            <Cpu class="title-icon" :size="26" style="color: var(--primary);" />
             ШІ Тренер
           </h2>
           <button @click="generatePlan" :disabled="isGenerating" class="btn-ai">
-            {{ isGenerating ? 'Аналізую...' : 'Оновити план' }}
+            <span v-if="isGenerating"><Loader2 class="animate-spin" :size="16" style="vertical-align: middle; margin-right: 5px;"/> Аналізую...</span>
+            <span v-else>Оновити план</span>
           </button>
         </div>
 
         <div v-if="user.plans && user.plans.length > 0">
           <div class="ai-focus">
-            <p class="label">Фокус тренування:</p>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+              <p class="label">Фокус тренування:</p>
+              <p class="label" style="font-weight: bold; color: #ff9800;">План від: {{ formatDate(user.plans[user.plans.length - 1].date) }}</p>
+            </div>
             <p class="value">{{ user.plans[user.plans.length - 1].plan_focus }}</p>
           </div>
           <p class="ai-content">
@@ -251,6 +234,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { User, Loader2, Settings, Edit2, AlertTriangle, Cpu } from 'lucide-vue-next'
 
 const router = useRouter()
 const currentUserId = localStorage.getItem('userId')
@@ -288,7 +272,11 @@ const getLocalDateString = (dateObj) => {
   return `${year}-${month}-${day}`
 }
 
-// Генерація 7-денної чернетки
+/**
+ * @function generateDraft
+ * @description Автоматично генерує 7-денну чернетку тренувального циклу 
+ * на основі вказаної користувачем частоти та інтенсивності.
+ */
 const generateDraft = () => {
   const intensityMap = {
     "Легко": { duration: 45, rpe: 4 },
@@ -299,12 +287,13 @@ const generateDraft = () => {
   const today = new Date()
   const daysArray = []
 
+  // 1. Спочатку заповнюємо всі 7 днів як "Відновлення"
   for (let i = 0; i < 7; i++) {
     const d = new Date(today)
     d.setDate(d.getDate() - i)
     daysArray.push({
       date: getLocalDateString(d),
-      trained: false,
+      activity_type: 'Recovery', 
       duration_minutes: stats.duration,
       rpe_score: stats.rpe,
       sleep_hours: calibrationForm.value.sleep_hours
@@ -315,10 +304,9 @@ const generateDraft = () => {
     const totalDays = Math.min(calibrationForm.value.frequency, 7);
     const slots = [0, 1, 2, 3, 4, 5, 6].sort(() => Math.random() - 0.5);
     for (let i = 0; i < totalDays; i++) {
-      daysArray[slots[i]].trained = true;
+      daysArray[slots[i]].activity_type = 'Training';
     }
   }
-
   draftDays.value = daysArray.reverse()
   calibrationStep.value = 2
 }
@@ -326,6 +314,7 @@ const generateDraft = () => {
 // Збереження даних
 const submitExactData = async () => {
   isCalibrating.value = true
+  console.log("Відправляємо на сервер:", JSON.stringify(draftDays.value, null, 2))
   try {
     const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}/calibrate`, {
       method: 'POST',
@@ -483,7 +472,7 @@ const fetchUser = async () => {
   // 1. МИТТЄВЕ ЗАВАНТАЖЕННЯ: Одразу дістаємо дані з пам'яті телефону (якщо є)
   const cachedData = localStorage.getItem(`user_data_${currentUserId}`)
   if (cachedData) {
-    console.log('📦 Офлайн-кеш: Дані завантажено з пам\'яті')
+    console.log('Офлайн-кеш: Дані завантажено з пам\'яті')
     user.value = JSON.parse(cachedData)
     
     // Перевіряємо, чи треба калібрування (якщо кеш порожній на тренування)
@@ -503,7 +492,7 @@ const fetchUser = async () => {
 
       // 3. МАГІЯ: Зберігаємо свіжі дані в пам'ять телефону для наступних офлайн-заходів!
       localStorage.setItem(`user_data_${currentUserId}`, JSON.stringify(freshUser))
-      console.log('☁️ Сервер: Дані оновлено та збережено в кеш')
+      console.log('Сервер: Дані оновлено та збережено в кеш')
 
       if (!user.value.metrics || user.value.metrics.length === 0) {
         showCalibrationModal.value = true
@@ -846,63 +835,6 @@ onMounted(() => {
   font-weight: bold; 
 }
 
-/* --- Перемикач (Toggle Checkbox) --- */
-.toggle-switch { 
-  position: relative; 
-  display: flex; 
-  align-items: center; 
-  cursor: pointer; 
-  gap: 10px; 
-}
-
-.toggle-switch input { 
-  opacity: 0; 
-  width: 0; 
-  height: 0; 
-}
-
-.toggle-slider { 
-  width: 36px; 
-  height: 20px; 
-  background-color: #333; 
-  border-radius: 20px; 
-  position: relative; 
-  transition: .4s; 
-}
-
-.toggle-slider:before { 
-  position: absolute; 
-  content: ""; 
-  height: 16px; 
-  width: 16px; 
-  left: 2px; 
-  bottom: 2px; 
-  background-color: #b0bec5; 
-  border-radius: 50%; 
-  transition: .4s; 
-}
-
-input:checked + .toggle-slider { 
-  background-color: #ff9800; 
-}
-
-input:checked + .toggle-slider:before { 
-  transform: translateX(16px); 
-  background-color: #fff; 
-}
-
-.toggle-label { 
-  font-size: 0.85em; 
-  color: #b0bec5; 
-  min-width: 80px; 
-  text-align: right; 
-}
-
-input:checked ~ .toggle-label { 
-  color: #ff9800; 
-  font-weight: bold; 
-}
-
 /* =========================================
    АНАЛІТИКА ЗДОРОВ'Я ТА МЕТРИКИ
    ========================================= */
@@ -1078,4 +1010,15 @@ input:checked ~ .toggle-label {
   gap: 15px; 
   justify-content: space-between; 
 }
+
+/* --- Кольорові бейджі для Select --- */
+.badge {
+  font-weight: bold;
+  font-size: 0.9em;
+  border-radius: 4px;
+}
+.badge.recovery { color: #4caf50; background: rgba(76, 175, 80, 0.1); }
+.badge.training { color: #fff; background: rgba(255, 255, 255, 0.1); }
+.badge.game { color: #ff9800; background: rgba(255, 152, 0, 0.1); }
+
 </style>

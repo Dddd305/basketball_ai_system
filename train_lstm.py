@@ -22,7 +22,7 @@ for player_id in range(num_players):
     base_rpe = np.random.uniform(4.0, 7.0)
     
     for day in range(days_per_player):
-        # Додаємо трохи випадковості для кожного дня
+        # Додавання випадковості для кожного дня
         sleep = np.clip(np.random.normal(base_sleep, 1.5), 2.0, 12.0) # Сон від 2 до 12 годин
         rpe = np.clip(np.random.normal(base_rpe, 2.0), 0.0, 10.0)     # RPE від 0 до 10
         duration = np.clip(np.random.normal(60, 30), 0.0, 150.0)      # Тривалість від 0 до 150 хв
@@ -42,10 +42,10 @@ df = pd.DataFrame(data, columns=['player_id', 'sleep_hours', 'rpe', 'duration'])
 # Ризик обчислюється на основі накопиченої втоми (низький сон + високе навантаження)
 df['daily_stress'] = (df['rpe'] * df['duration']) / (df['sleep_hours'] * 10)
 
-# Використовуємо ковзне вікно (rolling) для обчислення накопиченого стресу за останні 7 днів
+# Використовування ковзаного вікна (rolling) для обчислення накопиченого стресу за останні 7 днів
 df['accumulated_stress'] = df.groupby('player_id')['daily_stress'].transform(lambda x: x.rolling(7, min_periods=1).mean())
 
-# Нормалізуємо цільову змінну (Ризик від 0.0 до 1.0)
+# Нормалізація цільової змінну (Ризик від 0.0 до 1.0)
 target_scaler = MinMaxScaler()
 df['fatigue_risk'] = target_scaler.fit_transform(df[['accumulated_stress']])
 
@@ -56,11 +56,11 @@ print("Формування вікон часу...")
 TIME_STEPS = 7
 X, y = [], []
 
-# Нормалізуємо вхідні дані (Сон, RPE, Тривалість), щоб мережі було легше вчитися
+# Нормалізація вхідних даних (Сон, RPE, Тривалість), щоб мережі було легше вчитися
 feature_scaler = MinMaxScaler()
 df[['sleep_hours', 'rpe', 'duration']] = feature_scaler.fit_transform(df[['sleep_hours', 'rpe', 'duration']])
 
-# Зберігаємо "лінійку" (scaler), щоб потім нормалізувати реальні дані з бекенду
+# Збереження "лінійки" (scaler), щоб потім нормалізувати реальні дані з бекенду
 with open('scaler.pkl', 'wb') as f:
     pickle.dump(feature_scaler, f)
 
@@ -68,7 +68,7 @@ for player_id in range(num_players):
     player_data = df[df['player_id'] == player_id][['sleep_hours', 'rpe', 'duration']].values
     player_target = df[df['player_id'] == player_id]['fatigue_risk'].values
     
-    # Йдемо по днях і збираємо блоки по 7 днів
+    # Йде по днях і збираються блоки по 7 днів
     for i in range(len(player_data) - TIME_STEPS):
         X.append(player_data[i : i + TIME_STEPS])
         y.append(player_target[i + TIME_STEPS])
@@ -93,9 +93,9 @@ model = Sequential([
 model.compile(optimizer='adam', loss='mse', metrics=['mae'])
 
 print("Починаємо тренування мозку...")
-# Тренуємо мережу, розбиваючи дані: 80% на навчання, 20% на перевірку
+# Тренування мережі, розбиваючи дані: 80% на навчання, 20% на перевірку
 history = model.fit(X, y, epochs=15, batch_size=64, validation_split=0.2)
 
-# Зберігаємо натреновану мережу у файл
+# Збереження натренованої мережі у файл
 model.save('basketball_lstm.keras')
 print("Готово! Модель 'basketball_lstm.keras' та 'scaler.pkl' успішно збережені.")

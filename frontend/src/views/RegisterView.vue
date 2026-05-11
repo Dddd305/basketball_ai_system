@@ -2,13 +2,8 @@
   <div class="auth-container">
     <div class="auth-card">
       
-      <div class="logo-container">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-          <circle cx="8.5" cy="7" r="4"></circle>
-          <line x1="20" y1="8" x2="20" y2="14"></line>
-          <line x1="23" y1="11" x2="17" y2="11"></line>
-        </svg>
+      <div class="logo-container" style="display: flex; justify-content: center; margin-bottom: 10px;">
+        <Dribbble :size="56" color="#ff9800" stroke-width="1.5" />
       </div>
       
       <h1 class="auth-title">Новий гравець</h1>
@@ -17,12 +12,11 @@
       <form @submit.prevent="register" class="auth-form">
         
         <div class="form-group">
-          <label>Ім'я та Прізвище</label>
+          <label>Ім'я</label>
           <input 
             type="text" 
             v-model="formData.name" 
             required 
-            placeholder="Напр: Дмитро" 
             class="input-field" 
           />
         </div>
@@ -32,22 +26,31 @@
           <input 
             type="email" 
             v-model="formData.email" 
-            required 
-            placeholder="player@gmail.com" 
+            required  
             class="input-field" 
           />
         </div>
 
         <div class="form-group">
           <label>Пароль</label>
-          <input 
-            type="password" 
-            v-model="formData.password" 
-            required 
-            placeholder="Мінімум 6 символів" 
-            minlength="6"
-            class="input-field" 
-          />
+          <div style="position: relative; display: flex; align-items: center;">
+            <input 
+              :type="showPassword ? 'text' : 'password'" 
+              v-model="formData.password" 
+              required 
+              minlength="6"
+              class="input-field" 
+              style="width: 100%; padding-right: 40px; box-sizing: border-box;"
+            />
+            <button 
+              type="button" 
+              @click="togglePassword" 
+              style="position: absolute; right: 10px; background: none; border: none; color: #b0bec5; cursor: pointer; padding: 0; display: flex; align-items: center;"
+            >
+              <EyeOff v-if="showPassword" :size="20" />
+              <Eye v-else :size="20" />
+            </button>
+          </div>
         </div>
 
         <div class="form-row">
@@ -79,7 +82,11 @@
         </div>
 
         <button type="submit" :disabled="isLoading" class="btn-primary">
-          {{ isLoading ? 'Створення...' : 'Зареєструватися' }}
+          <span v-if="isLoading">
+            <Loader2 class="animate-spin" :size="18" style="vertical-align: middle; margin-right: 5px;" />
+            Створення...
+          </span>
+          <span v-else>Зареєструватися</span>
         </button>
       </form>
 
@@ -99,20 +106,27 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Dribbble, Eye, EyeOff, Loader2 } from 'lucide-vue-next'
 
 const router = useRouter()
+const showPassword = ref(false)
+
+const togglePassword = () => {
+  showPassword.value = !showPassword.value
+}
+
 const isLoading = ref(false)
 const errorMessage = ref('')
 
-// Дані форми за замовчуванням
+// Дані форми з оптимізованими дефолтними значеннями
 const formData = ref({
   name: '',
   email: '',
   password: '',
-  age: 20,
-  position: 'PG',
-  height_cm: 185,
-  weight_kg: 80
+  age: '',
+  position: '',
+  height_cm: '',
+  weight_kg: ''
 })
 
 const register = async () => {
@@ -129,12 +143,9 @@ const register = async () => {
     const data = await response.json()
 
     if (response.ok) {
-      // Якщо успішно - відразу логінимо користувача (зберігаємо отриманий ID)
       localStorage.setItem('userId', data.user_id)
-      // Переходимо на Dashboard
       router.push('/dashboard')
     } else {
-      // Якщо помилка (наприклад, Email зайнятий)
       errorMessage.value = data.detail || 'Помилка реєстрації. Перевірте дані.'
     }
   } catch (error) {

@@ -35,7 +35,7 @@ const router = createRouter({
   ]
 })
 
-// Захист маршрутів: дозволяємо доступ до /login та /register без авторизації
+// Захист маршрутів: дозволяється доступ до /login та /register без авторизації
 router.beforeEach((to, from, next) => {
   const isAuthenticated = localStorage.getItem('userId')
   
