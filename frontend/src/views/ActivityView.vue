@@ -575,8 +575,19 @@ onUnmounted(() => {
 
 @media (max-width: 600px) {
   .form-row {
-    flex-direction: column;
+    flex-direction: row; 
     gap: 10px;
+  }
+
+  .form-group {
+    min-width: 0; 
+  }
+
+  .form-group label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.8em;
   }
 }
 </style>
