@@ -7,3 +7,4 @@ pydantic
 tensorflow-cpu
 scikit-learn
 PyJWT==2.8.0
+python-dotenv==1.0.1

@@ -1,9 +1,15 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+import os
+from dotenv import load_dotenv
 
-# Рядок підключення. Формат: postgresql://користувач:пароль@хост:порт/назва_бази
-SQLALCHEMY_DATABASE_URL = "postgresql://neondb_owner:npg_h0C9rlEwQFvn@ep-young-lake-alqfuwz1.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require"
+load_dotenv()
+
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not SQLALCHEMY_DATABASE_URL:
+    raise ValueError("Помилка: DATABASE_URL не знайдено у файлі .env або системі!")
 
 # Двигун, який фізично виконує запити до БД
 engine = create_engine(

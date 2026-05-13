@@ -51,10 +51,17 @@ def ping_server():
 import jwt
 from fastapi.security import OAuth2PasswordBearer
 from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv 
 
-SECRET_KEY = "diploma_super_secret_key_2026" # Ключ для шифрування (нікому не кажи!)
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("Помилка: SECRET_KEY не знайдено!")
+
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # Токен живе 7 днів
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/users/login")
 
