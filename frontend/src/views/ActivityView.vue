@@ -205,8 +205,7 @@ const fetchUser = async () => {
 /**
  * @function renderChart
  * @description Відмальовує гістограму навантажень за останні 7 днів за допомогою Chart.js.
- * Враховує коефіцієнт ігрового амплуа (posCoeff) та змагального стресу (Game = 1.25).
- * Попередньо очищує старий інстанс графіка для запобігання витоку пам'яті.
+ * Синхронізовано з формулою бекенду (Тривалість x RPE).
  */
 const renderChart = () => {
   if (!hasMetrics.value || !chartCanvas.value) return
@@ -215,15 +214,14 @@ const renderChart = () => {
   const recentMetrics = sortedMetrics.value.slice(0, 7).reverse() 
 
   const labels = recentMetrics.map(m => m.date.substring(5)) 
-  const posCoeff = (user.value.position === 'PG' || user.value.position === 'SG') ? 1.2 : 1.5;
   
   const data = recentMetrics.map(m => {
     if (m.activity_type === 'Recovery') return 0;
-    const typeCoeff = m.activity_type === 'Game' ? 1.25 : 1.0;
-    return Math.round(m.duration_minutes * m.rpe_score * posCoeff * typeCoeff);
+    return m.duration_minutes * m.rpe_score;
   });
 
-  const colors = data.map(value => value > 800 ? '#e65100' : '#ff9800')
+  // Червоний колір, якщо навантаження за день вище 600 (критична зона)
+  const colors = data.map(value => value > 600 ? '#e65100' : '#ff9800')
 
   if (chartInstance) chartInstance.destroy()
 
@@ -245,7 +243,16 @@ const renderChart = () => {
         y: { beginAtZero: true, ticks: { color: '#b0bec5' }, grid: { color: '#333333' } },
         x: { ticks: { color: '#b0bec5' }, grid: { display: false } }
       },
-      plugins: { legend: { display: false } }
+      plugins: { 
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return 'Навантаження: ' + context.parsed.y;
+            }
+          }
+        }
+      }
     }
   })
 }

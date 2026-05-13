@@ -92,7 +92,62 @@ def login_user(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
 def get_user(user_id: int, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Гравця не знайдено")
+        raise HTTPException(status_code=404, detail="Користувача не знайдено")
+    
+    import datetime as dt
+    
+    # Розрахунок Readiness Score
+    sorted_metrics = sorted(user.metrics, key=lambda x: x.date)
+    if not sorted_metrics:
+        setattr(user, 'readiness_score', 100)
+        setattr(user, 'acwr_ratio', "0.00")
+        setattr(user, 'acwr_status', "Немає даних")
+        return user
+        
+    last_metric = sorted_metrics[-1]
+    sleep_points = min((last_metric.sleep_hours / 8.0) * 60, 60)
+    fatigue_points = ((10 - last_metric.rpe_score) / 10.0) * 40
+    setattr(user, 'readiness_score', round(sleep_points + fatigue_points))
+
+    # Розрахунок ACWR
+    now = dt.date.today()
+    oldest_date = sorted_metrics[0].date
+    days_in_system = (now - oldest_date).days + 1
+    
+    setattr(user, 'days_in_system', days_in_system)
+    
+    acute_load = 0
+    chronic_load_total = 0
+    
+    for m in sorted_metrics:
+        diff_days = (now - m.date).days
+        daily_load = m.duration_minutes * m.rpe_score
+        
+        if diff_days <= 7:
+            acute_load += daily_load
+        if diff_days <= 28:
+            chronic_load_total += daily_load
+            
+    import math
+    weeks_in_system = min(4, max(1, math.ceil(days_in_system / 7.0)))
+    chronic_load = chronic_load_total / weeks_in_system
+    
+    if chronic_load == 0:
+        ratio = "2.00" if acute_load > 0 else "0.00"
+    else:
+        ratio = f"{(acute_load / chronic_load):.2f}"
+        
+    setattr(user, 'acwr_ratio', ratio)
+    
+    val = float(ratio)
+    if val == 0: status_text = "Немає даних"
+    elif val < 0.8: status_text = "Недотренованість"
+    elif val <= 1.3: status_text = "Оптимальна зона"
+    elif val <= 1.5: status_text = "Зона ризику"
+    else: status_text = "Небезпека травми"
+    
+    setattr(user, 'acwr_status', status_text)
+
     return user
 
 @app.put("/api/users/{user_id}", response_model=schemas.UserResponse)

@@ -153,28 +153,28 @@
         
         <div class="card science-card">
           <p class="label">Індекс готовності</p>
-          <div class="readiness-score" :style="{ color: readinessColor }">
-            {{ readinessScore }}%
+          <div class="readiness-score" :style="{ color: getReadinessColor(user.readiness_score) }">
+            {{ user.readiness_score }}%
           </div>
           <p class="science-hint">На основі останнього сну та RPE</p>
           <div class="progress-bg">
-            <div class="progress-fill" :style="{ width: readinessScore + '%', backgroundColor: readinessColor }"></div>
+            <div class="progress-fill" :style="{ width: user.readiness_score + '%', backgroundColor: getReadinessColor(user.readiness_score) }"></div>
           </div>
         </div>
 
         <div class="card science-card">
           <div style="display: flex; justify-content: center; align-items: center; gap: 10px;">
             <p class="label" title="Acute:Chronic Workload Ratio" style="margin: 0;">Коефіцієнт ACWR</p>
-            <span v-if="isAcwrCalibrating" title="Збір повноцінної хронічної бази (28 днів)" style="display: flex; align-items: center; background: rgba(255, 152, 0, 0.15); color: #ff9800; font-size: 0.65em; padding: 3px 6px; border-radius: 4px; border: 1px solid rgba(255, 152, 0, 0.5); text-transform: uppercase; font-weight: bold;">
+            <span v-if="user.days_in_system < 28" title="Збір повноцінної хронічної бази (28 днів)" style="display: flex; align-items: center; background: rgba(255, 152, 0, 0.15); color: #ff9800; font-size: 0.65em; padding: 3px 6px; border-radius: 4px; border: 1px solid rgba(255, 152, 0, 0.5); text-transform: uppercase; font-weight: bold;">
               <AlertTriangle :size="12" style="margin-right: 4px;" />
-              {{ daysInSystem }}/28 дн.
+              {{ user.days_in_system }}/28 дн.
             </span>
           </div>
-          <div class="acwr-score" :style="{ color: acwrColor }">
-            {{ acwrRatio }}
+          <div class="acwr-score" :style="{ color: getAcwrColor(user.acwr_ratio) }">
+            {{ user.acwr_ratio }}
           </div>
-          <p class="science-hint" :style="{ color: acwrColor, fontWeight: 'bold' }">
-            {{ acwrStatusText }}
+          <p class="science-hint" :style="{ color: getAcwrColor(user.acwr_ratio), fontWeight: 'bold' }">
+            {{ user.acwr_status }}
           </p>
           <p class="science-hint" style="margin-top: 5px;">Норма: 0.8 - 1.3</p>
         </div>
@@ -242,6 +242,31 @@ const currentUserId = localStorage.getItem('userId')
 const user = ref(null)
 const loading = ref(true)
 const isGenerating = ref(false)
+
+// ==========================================
+// --- УТИЛІТИ ДЛЯ КОЛЬОРІВ ---
+// ==========================================
+/**
+ * Визначає колір для індексу готовності
+ * @param {number} score - Значення готовності 0-100
+ */
+const getReadinessColor = (score) => {
+  if (score >= 80) return '#4caf50' 
+  if (score >= 60) return '#ffeb3b' 
+  return '#f44336' 
+}
+
+/**
+ * Визначає колір для коефіцієнта ACWR
+ * @param {string} ratio - Значення ACWR (напр. "1.15")
+ */
+const getAcwrColor = (ratio) => {
+  const val = parseFloat(ratio)
+  if (val === 0 || val < 0.8) return '#b0bec5'
+  if (val <= 1.3) return '#4caf50'
+  if (val <= 1.5) return '#ff9800'
+  return '#f44336'
+}
 
 // ==========================================
 // --- ЛОГІКА КАЛІБРУВАННЯ (ГІБРИДНА) ---
@@ -357,96 +382,6 @@ const saveProfile = async () => {
   }
 }
 
-// --- СПОРТИВНА МАТЕМАТИКА ---
-
-// 1. Індекс готовності (0-100%)
-const readinessScore = computed(() => {
-  if (!user.value || !user.value.metrics || user.value.metrics.length === 0) return 100
-  
-  const sortedMetrics = [...user.value.metrics].sort((a, b) => new Date(a.date) - new Date(b.date))
-  const lastMetric = sortedMetrics[sortedMetrics.length - 1]
-  
-  let sleepPoints = (lastMetric.sleep_hours / 8) * 60
-  if (sleepPoints > 60) sleepPoints = 60
-  
-  const fatiguePoints = ((10 - lastMetric.rpe_score) / 10) * 40
-  
-  return Math.round(sleepPoints + fatiguePoints)
-})
-
-const readinessColor = computed(() => {
-  if (readinessScore.value >= 80) return '#4caf50' 
-  if (readinessScore.value >= 60) return '#ffeb3b' 
-  return '#f44336' 
-})
-
-// 2. Розрахунок ACWR
-const daysInSystem = computed(() => {
-  if (!user.value || !user.value.metrics || user.value.metrics.length === 0) return 0
-  const now = new Date()
-  
-  // Шукаємо дату найпершого тренування
-  const oldestDateStr = user.value.metrics.reduce((oldest, m) => {
-    return new Date(m.date) < new Date(oldest) ? m.date : oldest
-  }, user.value.metrics[0].date)
-
-  const diffTime = Math.abs(now - new Date(oldestDateStr))
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-})
-
-// Чи показувати попередження про те, що минуло менше 28 днів
-const isAcwrCalibrating = computed(() => {
-  return daysInSystem.value < 28
-})
-
-// Головна формула з динамічним знаменником
-const acwrRatio = computed(() => {
-  if (!user.value || !user.value.metrics || user.value.metrics.length === 0) return "0.00"
-  
-  const now = new Date()
-  let acuteLoad = 0 
-  let chronicLoadTotal = 0 
-  
-  user.value.metrics.forEach(m => {
-    const metricDate = new Date(m.date)
-    const diffTime = Math.abs(now - metricDate)
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
-    const dailyLoad = m.duration_minutes * m.rpe_score
-    
-    if (diffDays <= 7) acuteLoad += dailyLoad
-    if (diffDays <= 28) chronicLoadTotal += dailyLoad
-  })
-  
-  // Динамічний знаменник: ділимо на фактичну кількість тижнів
-  let weeksInSystem = Math.ceil(daysInSystem.value / 7)
-  if (weeksInSystem === 0) weeksInSystem = 1 // Мінімум 1 тиждень
-  if (weeksInSystem > 4) weeksInSystem = 4   // Максимум 4 тижні (28 днів)
-  
-  const chronicLoad = chronicLoadTotal / weeksInSystem 
-  
-  if (chronicLoad === 0) return acuteLoad > 0 ? "2.00" : "0.00"
-  
-  return (acuteLoad / chronicLoad).toFixed(2)
-})
-
-const acwrStatusText = computed(() => {
-  const val = parseFloat(acwrRatio.value)
-  if (val === 0) return "Немає даних"
-  if (val < 0.8) return "Недотренованість"
-  if (val <= 1.3) return "Оптимальна зона (Sweet Spot)"
-  if (val <= 1.5) return "Зона ризику"
-  return "Небезпека травми!"
-})
-
-const acwrColor = computed(() => {
-  const val = parseFloat(acwrRatio.value)
-  if (val === 0 || val < 0.8) return '#b0bec5' 
-  if (val <= 1.3) return '#4caf50' 
-  if (val <= 1.5) return '#ff9800' 
-  return '#f44336' 
-})
-
 // --- БАЗОВА СТАТИСТИКА ---
 const totalHoursPlayed = computed(() => {
   if (!user.value || !user.value.metrics) return 0
@@ -475,13 +410,13 @@ const fetchUser = async () => {
     console.log('Офлайн-кеш: Дані завантажено з пам\'яті')
     user.value = JSON.parse(cachedData)
     
-    // Перевіряємо, чи треба калібрування (якщо кеш порожній на тренування)
+    // Перевіряємо, чи треба калібрування
     if (!user.value.metrics || user.value.metrics.length === 0) {
       showCalibrationModal.value = true
     }
   }
 
-  // 2. ОНОВЛЕННЯ З ФОНУ: Якщо є Інтернет, тихенько тягнемо найсвіжіші дані з сервера
+  // 2. ОНОВЛЕННЯ З ФОНУ: Якщо є Інтернет, тягнемо найсвіжіші дані з сервера
   if (navigator.onLine) {
     try {
       const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}`) 
@@ -490,18 +425,17 @@ const fetchUser = async () => {
       const freshUser = await response.json()
       user.value = freshUser // Оновлюємо екран новими даними
 
-      // 3. МАГІЯ: Зберігаємо свіжі дані в пам'ять телефону для наступних офлайн-заходів!
+      // 3. Зберігаємо свіжі дані в пам'ять
       localStorage.setItem(`user_data_${currentUserId}`, JSON.stringify(freshUser))
       console.log('Сервер: Дані оновлено та збережено в кеш')
 
       if (!user.value.metrics || user.value.metrics.length === 0) {
         showCalibrationModal.value = true
       } else {
-        showCalibrationModal.value = false // Ховаємо модалку, якщо дані вже є
+        showCalibrationModal.value = false 
       }
     } catch (error) {
       console.error('Помилка оновлення з сервера:', error)
-      // Якщо сервер впав, але у нас є кеш — ми нічого не робимо, користувач бачитиме старі дані
     }
   } else if (!cachedData) {
     console.error('Немає підключення і немає збережених даних :(')
@@ -533,6 +467,7 @@ onMounted(() => {
   if (currentUserId) fetchUser()
   else logout()
 })
+
 </script>
 
 <style scoped>

@@ -2,10 +2,6 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 import datetime as dt
 
-from pydantic import BaseModel, Field
-from typing import Optional, List
-import datetime as dt
-
 # Базова схема користувача (без пароля)
 class UserBase(BaseModel):
     email: str = Field(..., example="player@gmail.com")
@@ -98,6 +94,11 @@ class UserWithDetails(UserBase):
     metrics: List['MetricResponse'] = []
     shoes: List['ShoeResponse'] = []
     plans: List['PlanResponse'] = []
+    
+    readiness_score: int = 100
+    acwr_ratio: str = "0.00"
+    acwr_status: str = "Немає даних"
+    days_in_system: int = 0
 
     class Config:
         from_attributes = True      
