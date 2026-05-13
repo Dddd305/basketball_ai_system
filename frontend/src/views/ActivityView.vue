@@ -250,13 +250,14 @@ const submitMetric = async () => {
   }
   
   try {
-    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${userId.value}/metrics`, {
-      method: 'POST', 
+    const API_URL = import.meta.env.VITE_API_URL;
+    const response = await fetch(`${API_URL}/api/users/${userId.value}/metrics`, {
+      method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token.value}`
-      }, 
-      body: JSON.stringify(payload) 
+      },
+      body: JSON.stringify(payload)
     })
     
     if (!response.ok) throw new Error('Помилка')

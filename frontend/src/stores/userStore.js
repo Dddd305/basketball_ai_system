@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 
+
 export const useUserStore = defineStore('user', {
   state: () => ({
     user: null,
@@ -30,10 +31,11 @@ export const useUserStore = defineStore('user', {
       // Оновлення з сервера (з JWT токеном)
       if (navigator.onLine) {
         try {
-          const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${this.userId}`, {
+           const API_URL = import.meta.env.VITE_API_URL;
+           const response = await fetch(`${API_URL}/api/users/${this.userId}`, {
             headers: {
-              'Authorization': `Bearer ${this.token}`, // 👈 Наш JWT Паспорт
-              'Content-Type': 'application/json'
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json'
             }
           })
 

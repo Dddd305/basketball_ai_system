@@ -314,7 +314,8 @@ const generateDraft = () => {
 const submitExactData = async () => {
   isCalibrating.value = true
   try {
-    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${userId.value}/calibrate`, {
+    const API_URL = import.meta.env.VITE_API_URL;
+    const response = await fetch(`${API_URL}/api/users/${userId.value}/calibrate`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -347,8 +348,8 @@ const cancelEditing = () => { isEditing.value = false }
 
 const saveProfile = async () => {
   try {
-    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${userId.value}`, {
-      method: 'PUT', 
+    const API_URL = import.meta.env.VITE_API_URL;
+    const response = await fetch(`${API_URL}/api/users/${userId.value}`, {
       headers: { 
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token.value}`
@@ -385,7 +386,8 @@ const currentRiskStatus = computed(() => {
 const generatePlan = async () => {
   isGenerating.value = true
   try {
-    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/ai/generate_plan/${userId.value}`, { 
+    const API_URL = import.meta.env.VITE_API_URL;
+    const response = await fetch(`${API_URL}/api/ai/generate_plan/${userId.value}`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token.value}` }
     })

@@ -194,13 +194,14 @@ const addShoe = async () => {
 
   isAddingShoe.value = true
   try {
-    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${userId.value}/shoes`, {
-      method: 'POST', 
+    const API_URL = import.meta.env.VITE_API_URL;
+    const response = await fetch(`${API_URL}/api/users/${userId.value}/shoes`, {
+      method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token.value}`
-      }, 
-      body: JSON.stringify(newShoe.value)
+      },
+      body: JSON.stringify(newShoe.value) 
     })
     
     if (!response.ok) throw new Error('Помилка сервера при збереженні')
@@ -217,7 +218,7 @@ const addShoe = async () => {
 }
 
 const deleteShoe = async (shoeId, shoeName) => {
-  // 🛡 ЗАХИСТ ОФЛАЙНУ
+  // Захист офлайну
   if (!navigator.onLine) {
     alert('Відсутнє підключення. Видалення кросівок наразі недоступне в офлайн-режимі.')
     return
@@ -226,10 +227,11 @@ const deleteShoe = async (shoeId, shoeName) => {
   if (!confirm(`Видалити кросівки ${shoeName}?`)) return
   
   try {
-    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/shoes/${shoeId}`, { 
-      method: 'DELETE',
+    const API_URL = import.meta.env.VITE_API_URL;
+    const response = await fetch(`${API_URL}/api/shoes/${shoeId}`, {
+      method: 'DELETE', 
       headers: { 
-        'Authorization': `Bearer ${token.value}` 
+        'Authorization': `Bearer ${token.value}`
       }
     })
     
