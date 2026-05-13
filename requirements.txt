@@ -6,3 +6,4 @@ bcrypt
 pydantic
 tensorflow-cpu
 scikit-learn
+PyJWT==2.8.0

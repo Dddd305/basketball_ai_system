@@ -78,6 +78,15 @@ body {
   background-color: #121212;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #ffffff;
+  user-select: none;
+}
+
+p, h1, h2, h3, h4, h5, span, .ai-content {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+button, .nav-item, .btn-primary, .btn-outline {
   -webkit-user-select: none;
   user-select: none;
 }

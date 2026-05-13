@@ -136,10 +136,13 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { Archive, Loader2, Trash2 } from 'lucide-vue-next'
+import { useUserStore } from '../stores/userStore' 
+import { storeToRefs } from 'pinia'
 
-const currentUserId = localStorage.getItem('userId')
-const user = ref(null)
-const loading = ref(true)
+const userStore = useUserStore()
+
+const { user, loading, userId, token } = storeToRefs(userStore)
+
 const isAddingShoe = ref(false)
 
 const newShoe = ref({ 
@@ -149,7 +152,7 @@ const newShoe = ref({
   initial_wear_percentage: 0 
 })
 
-// --- ШІ КАЛЬКУЛЯТОР (Фронтенд-репліка бекенду для UX) ---
+// --- ШІ КАЛЬКУЛЯТОР ---
 const calculatedMaxLifespan = computed(() => {
   if (!user.value) return 80
   
@@ -167,7 +170,6 @@ const calculatedMaxLifespan = computed(() => {
   return Math.round(base * weightCoeff * surfaceCoeff * typeCoeff)
 })
 
-// Гібридне поле: години <-> відсотки
 const calculatedCurrentHours = computed({
   get: () => {
     return Math.round((newShoe.value.initial_wear_percentage / 100) * calculatedMaxLifespan.value)
@@ -180,42 +182,11 @@ const calculatedCurrentHours = computed({
 })
 
 // ==========================================
-// --- МЕРЕЖЕВІ ЗАПИТИ (OFFLINE-FIRST) ---
+// --- МЕРЕЖЕВІ ЗАПИТИ З JWT ТОКЕНОМ ---
 // ==========================================
-const fetchUser = async () => {
-  loading.value = true
-
-  // 1. Дістаємо з кешу (спільного з Дашбордом!)
-  const cachedData = localStorage.getItem(`user_data_${currentUserId}`)
-  if (cachedData) {
-    console.log('Інвентар: Дані завантажено з кешу')
-    user.value = JSON.parse(cachedData)
-  }
-
-  // 2. Оновлюємо з сервера, якщо є Інтернет
-  if (navigator.onLine) {
-    try {
-      const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}`) 
-      if (!response.ok) throw new Error('Помилка мережі')
-      
-      const freshUser = await response.json()
-      user.value = freshUser
-      
-      // 3. Зберігаємо оновлені дані
-      localStorage.setItem(`user_data_${currentUserId}`, JSON.stringify(freshUser))
-      console.log('Інвентар: Дані оновлено з сервера')
-    } catch (error) {
-      console.error('Помилка оновлення інвентарю:', error)
-    }
-  } else if (!cachedData) {
-    console.error('Немає підключення і немає збережених даних :(')
-  }
-
-  loading.value = false
-}
 
 const addShoe = async () => {
-  // 🛡 ЗАХИСТ ОФЛАЙНУ: Не даємо відправити запит без мережі
+  // Захист офлайну
   if (!navigator.onLine) {
     alert('Відсутнє підключення. Додавання кросівок наразі недоступне в офлайн-режимі.')
     return
@@ -223,15 +194,18 @@ const addShoe = async () => {
 
   isAddingShoe.value = true
   try {
-    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}/shoes`, {
+    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${userId.value}/shoes`, {
       method: 'POST', 
-      headers: { 'Content-Type': 'application/json' }, 
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token.value}`
+      }, 
       body: JSON.stringify(newShoe.value)
     })
     
     if (!response.ok) throw new Error('Помилка сервера при збереженні')
     
-    await fetchUser() // Після додавання сервер віддасть нові дані, які ми відразу закешуємо
+    await userStore.fetchUser()
     
     newShoe.value.brand_model = ''
     newShoe.value.initial_wear_percentage = 0
@@ -250,18 +224,29 @@ const deleteShoe = async (shoeId, shoeName) => {
   }
 
   if (!confirm(`Видалити кросівки ${shoeName}?`)) return
+  
   try {
-    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/shoes/${shoeId}`, { method: 'DELETE' })
+    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/shoes/${shoeId}`, { 
+      method: 'DELETE',
+      headers: { 
+        'Authorization': `Bearer ${token.value}` 
+      }
+    })
+    
     if (!response.ok) throw new Error('Помилка видалення')
-    await fetchUser()
+    
+    await userStore.fetchUser()
   } catch (error) {
     alert(error.message)
   }
 }
 
-onMounted(() => {
-  if (currentUserId) {
-    fetchUser()
+onMounted(async () => {
+  if (userId.value) {
+    // Якщо дані ще не завантажені (наприклад користувач оновив сторінку прямо на /gear)
+    if (!user.value) {
+      await userStore.fetchUser()
+    }
   }
 })
 </script>

@@ -107,8 +107,10 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Dribbble, Eye, EyeOff, Loader2 } from 'lucide-vue-next'
+import { useUserStore } from '../stores/userStore'
 
 const router = useRouter()
+const userStore = useUserStore()
 const showPassword = ref(false)
 
 const togglePassword = () => {
@@ -143,7 +145,7 @@ const register = async () => {
     const data = await response.json()
 
     if (response.ok) {
-      localStorage.setItem('userId', data.user_id)
+      userStore.setAuthData(data.user_id, data.access_token)
       router.push('/dashboard')
     } else {
       errorMessage.value = data.detail || 'Помилка реєстрації. Перевірте дані.'

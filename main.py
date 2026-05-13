@@ -48,6 +48,16 @@ def ping_server():
 # 2. ФУНКЦІЇ БЕЗПЕКИ (КРИПТОГРАФІЯ)
 # ==========================================
 
+import jwt
+from fastapi.security import OAuth2PasswordBearer
+from datetime import datetime, timedelta
+
+SECRET_KEY = "diploma_super_secret_key_2026" # Ключ для шифрування (нікому не кажи!)
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # Токен живе 7 днів
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/users/login")
+
 def get_password_hash(password: str) -> str:
     salt = bcrypt.gensalt()
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
@@ -56,11 +66,36 @@ def get_password_hash(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Недійсний або протермінований токен",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except jwt.PyJWTError:
+        raise credentials_exception
+        
+    user = db.query(models.User).filter(models.User.user_id == int(user_id)).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
 # ==========================================
 # 3. МАРШРУТИ АВТОРИЗАЦІЇ ТА ПРОФІЛЮ
 # ==========================================
 
-@app.post("/api/users/register", response_model=schemas.UserResponse)
+@app.post("/api/users/register") 
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(status_code=400, detail="Цей Email вже зайнятий")
@@ -77,7 +112,15 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return new_user
+    
+    access_token = create_access_token(data={"sub": str(new_user.user_id)})
+    
+    return {
+        "user_id": new_user.user_id,
+        "name": new_user.name,
+        "email": new_user.email,
+        "access_token": access_token
+    }
 
 @app.post("/api/users/login")
 def login_user(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
@@ -86,10 +129,20 @@ def login_user(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
     if not user or not verify_password(credentials.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Невірний email або пароль")
     
-    return {"status": "success", "user_id": user.user_id, "name": user.name}
+    access_token = create_access_token(data={"sub": str(user.user_id)})
+    
+    return {
+        "status": "success", 
+        "user_id": user.user_id, 
+        "name": user.name, 
+        "access_token": access_token
+    }
 
 @app.get("/api/users/{user_id}", response_model=schemas.UserWithDetails)
-def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(user_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Відмовлено в доступі. Це не ваші дані!")
+        
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Користувача не знайдено")

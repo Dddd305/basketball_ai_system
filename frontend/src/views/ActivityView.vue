@@ -136,15 +136,18 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import Chart from 'chart.js/auto'
 import { Activity, Loader2, PlusCircle, BarChart3, History, Download, CheckCircle } from 'lucide-vue-next'
+import { useUserStore } from '../stores/userStore'
+import { storeToRefs } from 'pinia'
 
 const router = useRouter()
-const currentUserId = localStorage.getItem('userId')
-const user = ref(null)
-const loading = ref(true)
+const userStore = useUserStore()
+
+const { user, loading, userId, token, isAuthenticated } = storeToRefs(userStore)
+
 const isSubmitting = ref(false)
 const successMessage = ref('')
 
@@ -168,44 +171,14 @@ const sortedMetrics = computed(() => {
   return [...user.value.metrics].sort((a, b) => new Date(b.date) - new Date(a.date))
 })
 
-/**
- * @function fetchUser
- * @description Асинхронно завантажує профіль користувача та його метрики.
- * Використовує архітектуру "Offline-First": спочатку віддає дані з localStorage, 
- * а потім фоново синхронізує їх з віддаленим сервером.
- * @returns {Promise<void>}
- */
-const fetchUser = async () => {
-  loading.value = true
-
-  const cachedData = localStorage.getItem(`user_data_${currentUserId}`)
-  if (cachedData) {
-    user.value = JSON.parse(cachedData)
-    setTimeout(() => renderChart(), 150)
-  }
-
-  if (navigator.onLine) {
-    try {
-      const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}`) 
-      if (!response.ok) throw new Error('Мережа')
-      
-      const freshUser = await response.json()
-      user.value = freshUser
-      
-      localStorage.setItem(`user_data_${currentUserId}`, JSON.stringify(freshUser))
-      setTimeout(() => renderChart(), 150)
-    } catch (error) {
-      console.error('Помилка синхронізації з сервером:', error)
-    }
-  }
-
-  loading.value = false
-}
+watch(sortedMetrics, async () => {
+  await nextTick() // Чекає, поки DOM оновиться
+  renderChart()
+}, { deep: true })
 
 /**
  * @function renderChart
  * @description Відмальовує гістограму навантажень за останні 7 днів за допомогою Chart.js.
- * Синхронізовано з формулою бекенду (Тривалість x RPE).
  */
 const renderChart = () => {
   if (!hasMetrics.value || !chartCanvas.value) return
@@ -220,7 +193,6 @@ const renderChart = () => {
     return m.duration_minutes * m.rpe_score;
   });
 
-  // Червоний колір, якщо навантаження за день вище 600 (критична зона)
   const colors = data.map(value => value > 600 ? '#e65100' : '#ff9800')
 
   if (chartInstance) chartInstance.destroy()
@@ -259,10 +231,7 @@ const renderChart = () => {
 
 /**
  * @function submitMetric
- * @description Обробляє відправку форми нового тренування. 
- * Включає валідацію на наявність інтернет-з'єднання.
- * У разі успіху автоматично тригерить оновлення локального стану та графіка.
- * @throws {Error} Якщо сервер повертає статус помилки.
+ * @description Відправляє тренування на сервер із JWT токеном.
  */
 const submitMetric = async () => {
   if (!navigator.onLine) {
@@ -281,18 +250,21 @@ const submitMetric = async () => {
   }
   
   try {
-    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}/metrics`, {
+    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${userId.value}/metrics`, {
       method: 'POST', 
-      headers: { 'Content-Type': 'application/json' }, 
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token.value}`
+      }, 
       body: JSON.stringify(payload) 
     })
     
     if (!response.ok) throw new Error('Помилка')
     
     successMessage.value = 'Збережено!'
-    await fetchUser() 
+    await userStore.fetchUser()
     
-    // Скидання форми (Form Reset)
+    // Скидання форми
     newMetric.value = {
       date: new Date().toISOString().split('T')[0],
       activity_type: 'Training',
@@ -312,11 +284,6 @@ const submitMetric = async () => {
   }
 }
 
-/**
- * @function exportToCSV
- * @description Генерує CSV-файл на льоту з масиву метрик користувача та 
- * ініціює його завантаження через тимчасовий DOM-елемент <a>.
- */
 const exportToCSV = () => {
   if (!hasMetrics.value) {
     return alert('Немає даних!');
@@ -343,7 +310,7 @@ const exportToCSV = () => {
   const link = document.createElement('a');
   
   link.setAttribute('href', url); 
-  link.setAttribute('download', `metrics_${currentUserId}.csv`);
+  link.setAttribute('download', `metrics_${userId.value}.csv`);
   document.body.appendChild(link); 
   link.click(); 
   document.body.removeChild(link);
@@ -354,12 +321,12 @@ const translateActivity = (type) => {
   return dict[type] || type
 }
 
-onMounted(() => {
-  if (!currentUserId) {
+onMounted(async () => {
+  if (!isAuthenticated.value) {
     router.push('/')
     return
   }
-  fetchUser()
+  await userStore.fetchUser()
 })
 
 onUnmounted(() => {

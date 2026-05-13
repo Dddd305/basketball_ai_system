@@ -235,31 +235,25 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Loader2, Settings, Edit2, AlertTriangle, Cpu } from 'lucide-vue-next'
+import { useUserStore } from '../stores/userStore'
+import { storeToRefs } from 'pinia'
 
 const router = useRouter()
-const currentUserId = localStorage.getItem('userId')
+const userStore = useUserStore()
 
-const user = ref(null)
-const loading = ref(true)
+const { user, loading, userId, token, isAuthenticated } = storeToRefs(userStore)
+
 const isGenerating = ref(false)
 
 // ==========================================
 // --- УТИЛІТИ ДЛЯ КОЛЬОРІВ ---
 // ==========================================
-/**
- * Визначає колір для індексу готовності
- * @param {number} score - Значення готовності 0-100
- */
 const getReadinessColor = (score) => {
   if (score >= 80) return '#4caf50' 
   if (score >= 60) return '#ffeb3b' 
   return '#f44336' 
 }
 
-/**
- * Визначає колір для коефіцієнта ACWR
- * @param {string} ratio - Значення ACWR (напр. "1.15")
- */
 const getAcwrColor = (ratio) => {
   const val = parseFloat(ratio)
   if (val === 0 || val < 0.8) return '#b0bec5'
@@ -269,27 +263,20 @@ const getAcwrColor = (ratio) => {
 }
 
 // ==========================================
-// --- ЛОГІКА КАЛІБРУВАННЯ (ГІБРИДНА) ---
+// --- ЛОГІКА КАЛІБРУВАННЯ ---
 // ==========================================
 const showCalibrationModal = ref(false)
 const isCalibrating = ref(false)
 const calibrationStep = ref(1)
 
-const calibrationForm = ref({
-  frequency: 3,
-  intensity: 'Середньо',
-  sleep_hours: 7.5
-})
-
+const calibrationForm = ref({ frequency: 3, intensity: 'Середньо', sleep_hours: 7.5 })
 const draftDays = ref([])
 
-// Форматування дати для відображення (напр., Пн, 12 Квітня)
 const formatDate = (dateString) => {
   const d = new Date(dateString)
   return d.toLocaleDateString('uk-UA', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
-// Форматування дати для відправки на сервер
 const getLocalDateString = (dateObj) => {
   const year = dateObj.getFullYear()
   const month = String(dateObj.getMonth() + 1).padStart(2, '0')
@@ -297,22 +284,12 @@ const getLocalDateString = (dateObj) => {
   return `${year}-${month}-${day}`
 }
 
-/**
- * @function generateDraft
- * @description Автоматично генерує 7-денну чернетку тренувального циклу 
- * на основі вказаної користувачем частоти та інтенсивності.
- */
 const generateDraft = () => {
-  const intensityMap = {
-    "Легко": { duration: 45, rpe: 4 },
-    "Середньо": { duration: 75, rpe: 6 },
-    "Важко": { duration: 100, rpe: 8 }
-  }
+  const intensityMap = { "Легко": { duration: 45, rpe: 4 }, "Середньо": { duration: 75, rpe: 6 }, "Важко": { duration: 100, rpe: 8 } }
   const stats = intensityMap[calibrationForm.value.intensity]
   const today = new Date()
   const daysArray = []
 
-  // 1. Спочатку заповнюємо всі 7 днів як "Відновлення"
   for (let i = 0; i < 7; i++) {
     const d = new Date(today)
     d.setDate(d.getDate() - i)
@@ -328,28 +305,27 @@ const generateDraft = () => {
   if (calibrationForm.value.frequency > 0) {
     const totalDays = Math.min(calibrationForm.value.frequency, 7);
     const slots = [0, 1, 2, 3, 4, 5, 6].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < totalDays; i++) {
-      daysArray[slots[i]].activity_type = 'Training';
-    }
+    for (let i = 0; i < totalDays; i++) { daysArray[slots[i]].activity_type = 'Training'; }
   }
   draftDays.value = daysArray.reverse()
   calibrationStep.value = 2
 }
 
-// Збереження даних
 const submitExactData = async () => {
   isCalibrating.value = true
-  console.log("Відправляємо на сервер:", JSON.stringify(draftDays.value, null, 2))
   try {
-    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}/calibrate`, {
+    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${userId.value}/calibrate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token.value}`
+      },
       body: JSON.stringify(draftDays.value)
     })
     
     if (!response.ok) throw new Error('Помилка при збереженні даних')
     
-    await fetchUser() 
+    await userStore.fetchUser() 
     showCalibrationModal.value = false 
   } catch (error) {
     alert('Помилка: ' + error.message)
@@ -371,11 +347,16 @@ const cancelEditing = () => { isEditing.value = false }
 
 const saveProfile = async () => {
   try {
-    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editForm.value)
+    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${userId.value}`, {
+      method: 'PUT', 
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token.value}`
+      }, 
+      body: JSON.stringify(editForm.value)
     })
     if (!response.ok) throw new Error('Помилка оновлення')
-    await fetchUser() 
+    await userStore.fetchUser()
     isEditing.value = false 
   } catch (error) {
     alert('Не вдалося зберегти зміни.')
@@ -400,57 +381,16 @@ const currentRiskStatus = computed(() => {
   return user.value.plans[user.value.plans.length - 1].fatigue_risk
 })
 
-// Отримання даних користувача
-const fetchUser = async () => {
-  loading.value = true
-
-  // 1. МИТТЄВЕ ЗАВАНТАЖЕННЯ: Одразу дістаємо дані з пам'яті телефону (якщо є)
-  const cachedData = localStorage.getItem(`user_data_${currentUserId}`)
-  if (cachedData) {
-    console.log('Офлайн-кеш: Дані завантажено з пам\'яті')
-    user.value = JSON.parse(cachedData)
-    
-    // Перевіряємо, чи треба калібрування
-    if (!user.value.metrics || user.value.metrics.length === 0) {
-      showCalibrationModal.value = true
-    }
-  }
-
-  // 2. ОНОВЛЕННЯ З ФОНУ: Якщо є Інтернет, тягнемо найсвіжіші дані з сервера
-  if (navigator.onLine) {
-    try {
-      const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/users/${currentUserId}`) 
-      if (!response.ok) throw new Error('Помилка мережі')
-      
-      const freshUser = await response.json()
-      user.value = freshUser // Оновлюємо екран новими даними
-
-      // 3. Зберігаємо свіжі дані в пам'ять
-      localStorage.setItem(`user_data_${currentUserId}`, JSON.stringify(freshUser))
-      console.log('Сервер: Дані оновлено та збережено в кеш')
-
-      if (!user.value.metrics || user.value.metrics.length === 0) {
-        showCalibrationModal.value = true
-      } else {
-        showCalibrationModal.value = false 
-      }
-    } catch (error) {
-      console.error('Помилка оновлення з сервера:', error)
-    }
-  } else if (!cachedData) {
-    console.error('Немає підключення і немає збережених даних :(')
-  }
-
-  loading.value = false
-}
-
 // Генерація плану від ШІ
 const generatePlan = async () => {
   isGenerating.value = true
   try {
-    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/ai/generate_plan/${currentUserId}`, { method: 'POST' })
+    const response = await fetch(`https://basketball-api-kyiv.onrender.com/api/ai/generate_plan/${userId.value}`, { 
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token.value}` }
+    })
     if (!response.ok) throw new Error('Помилка генерації')
-    await fetchUser() 
+    await userStore.fetchUser()
   } catch (error) {
     console.error('Помилка генерації:', error)
   } finally {
@@ -459,15 +399,22 @@ const generatePlan = async () => {
 }
 
 const logout = () => {
-  localStorage.removeItem('userId')
+  userStore.logout()
   router.push('/')
 }
 
-onMounted(() => {
-  if (currentUserId) fetchUser()
-  else logout()
+onMounted(async () => {
+  if (!isAuthenticated.value) {
+    logout()
+    return
+  }
+  
+  await userStore.fetchUser()
+  
+  if (user.value && (!user.value.metrics || user.value.metrics.length === 0)) {
+    showCalibrationModal.value = true
+  }
 })
-
 </script>
 
 <style scoped>
