@@ -327,7 +327,7 @@ const generateDraft = () => {
 const submitExactData = async () => {
   isCalibrating.value = true
   try {
-    const API_URL = import.meta.env.VITE_API_URL;
+    const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
     const response = await fetch(`${API_URL}/api/users/${userId.value}/calibrate`, {
       method: 'POST',
       headers: { 
@@ -361,7 +361,7 @@ const cancelEditing = () => { isEditing.value = false }
 
 const saveProfile = async () => {
   try {
-    const API_URL = import.meta.env.VITE_API_URL;
+    const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
     
     const payload = {
       name: editForm.value.name,
@@ -434,7 +434,7 @@ const currentPlan = computed(() => {
 const generatePlan = async () => {
   isGenerating.value = true
   try {
-    const API_URL = import.meta.env.VITE_API_URL;
+    const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
     const response = await fetch(`${API_URL}/api/ai/generate_plan/${userId.value}`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token.value}` }

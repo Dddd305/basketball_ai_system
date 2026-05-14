@@ -196,7 +196,7 @@ const addShoe = async () => {
 
   isAddingShoe.value = true
   try {
-    const API_URL = import.meta.env.VITE_API_URL;
+    const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
     const response = await fetch(`${API_URL}/api/users/${userId.value}/shoes`, {
       method: 'POST',
       headers: { 
@@ -229,7 +229,7 @@ const deleteShoe = async (shoeId, shoeName) => {
   if (!confirm(`Видалити кросівки ${shoeName}?`)) return
   
   try {
-    const API_URL = import.meta.env.VITE_API_URL;
+    const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
     const response = await fetch(`${API_URL}/api/shoes/${shoeId}`, {
       method: 'DELETE', 
       headers: { 
