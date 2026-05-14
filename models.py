@@ -16,9 +16,9 @@ class User(Base):
     position = Column(String)  # Ігрове амплуа (PG, SG, SF, PF, C)
 
     # Вказуються зв'язки (один гравець має багато метрик, кросівок і планів)
-    metrics = relationship("DailyMetric", back_populates="owner", lazy="selectin")
-    shoes = relationship("ShoeInventory", back_populates="owner", lazy="selectin")
-    plans = relationship("GeneratedPlan", back_populates="owner", lazy="selectin")
+    metrics = relationship("DailyMetric", back_populates="owner", lazy="selectin", cascade="all, delete-orphan")
+    shoes = relationship("ShoeInventory", back_populates="owner", lazy="selectin", cascade="all, delete-orphan")
+    plans = relationship("GeneratedPlan", back_populates="owner", lazy="selectin", cascade="all, delete-orphan")
 
 # Таблиця 2: Щоденні метрики (навантаження)
 class DailyMetric(Base):

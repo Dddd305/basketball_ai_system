@@ -150,7 +150,8 @@ const login = async () => {
 
   // Стандартний логін
   try {
-    const API_URL = import.meta.env.VITE_API_URL;
+    const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
+    console.log('Спроба входу. API_URL:', API_URL);
     const response = await fetch(`${API_URL}/api/users/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -225,7 +226,7 @@ const login = async () => {
 
 .login-subtitle {
   color: #b0bec5;
-  margin: 0 0 20px 0; /* Трохи зменшив відступ, бо тепер є кнопка PWA */
+  margin: 0 0 20px 0;
   font-size: 0.9em;
 }
 
