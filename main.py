@@ -345,25 +345,26 @@ def calibrate_user(user_id: int, days: List[schemas.CalibrationDay], db: Session
 
 @app.post("/api/users/{user_id}/metrics", response_model=schemas.MetricResponse)
 def create_metric(user_id: int, metric: schemas.MetricCreate, db: Session = Depends(get_db)):
-    # Перевірка на дублікати та виправлення зносу кросівок
-    existing_metric = db.query(models.DailyMetric).filter(
+    
+    existing_metrics = db.query(models.DailyMetric).filter(
         models.DailyMetric.user_id == user_id,
         models.DailyMetric.date == metric.date
-    ).first()
+    ).all()
 
-    if existing_metric:
-        if existing_metric.shoe_id and existing_metric.activity_type != "Recovery":
-            old_shoe = db.query(models.ShoeInventory).filter(models.ShoeInventory.shoe_id == existing_metric.shoe_id).first()
+    for ex_metric in existing_metrics:
+        if ex_metric.shoe_id and ex_metric.activity_type != "Recovery":
+            old_shoe = db.query(models.ShoeInventory).filter(models.ShoeInventory.shoe_id == ex_metric.shoe_id).first()
             if old_shoe:
-                old_shoe.current_hours_played -= existing_metric.duration_minutes / 60.0
-                old_shoe.current_hours_played = max(0.0, old_shoe.current_hours_played) # Захист від від'ємного зносу
+                old_shoe.current_hours_played -= ex_metric.duration_minutes / 60.0
+                old_shoe.current_hours_played = max(0.0, old_shoe.current_hours_played) # Захист від мінусів
         
-        db.delete(existing_metric)
-        db.commit()
+        db.delete(ex_metric)
+        
+    db.commit()
 
     new_metric = models.DailyMetric(**metric.dict(), user_id=user_id)
     db.add(new_metric)
-
+    
     if metric.shoe_id and metric.activity_type != "Recovery":
         shoe = db.query(models.ShoeInventory).filter(models.ShoeInventory.shoe_id == metric.shoe_id).first()
         if shoe:
@@ -432,6 +433,7 @@ try:
 except Exception as e:
     print(f"Помилка завантаження моделі: {e}")
     model = None
+    scaler = None
 
 @app.post("/api/ai/generate_plan/{user_id}", response_model=schemas.PlanResponse)
 def generate_plan(user_id: int, db: Session = Depends(get_db)):

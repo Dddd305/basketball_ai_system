@@ -178,7 +178,7 @@ const sortedMetrics = computed(() => {
 watch(sortedMetrics, async () => {
   await nextTick() // Чекає, поки DOM оновиться
   renderChart()
-}, { deep: true })
+}, { deep: true, immediate: true })
 
 /**
  * @function renderChart
