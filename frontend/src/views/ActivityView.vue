@@ -175,9 +175,11 @@ const sortedMetrics = computed(() => {
   return [...user.value.metrics].sort((a, b) => b.date.localeCompare(a.date))
 })
 
-watch(sortedMetrics, async () => {
+watch([sortedMetrics, user], async () => {
+  if (user.value) {
   await nextTick() // Чекає, поки DOM оновиться
   renderChart()
+  }
 }, { deep: true, immediate: true })
 
 /**

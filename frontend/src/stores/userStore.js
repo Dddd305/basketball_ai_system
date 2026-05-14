@@ -31,7 +31,7 @@ export const useUserStore = defineStore('user', {
       // Оновлення з сервера (з JWT токеном)
       if (navigator.onLine) {
         try {
-           const API_URL = import.meta.env.VITE_API_URL;
+           const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
            const response = await fetch(`${API_URL}/api/users/${this.userId}`, {
             headers: {
                 'Authorization': `Bearer ${this.token}`,
