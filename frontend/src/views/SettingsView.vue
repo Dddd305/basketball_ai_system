@@ -180,6 +180,7 @@ const updateEmail = async () => {
 
   isUpdatingEmail.value = true
   try {
+    const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
     const response = await fetch(`${API_URL}/api/users/me/change-email`, {
       method: 'PUT',
       headers: {
@@ -214,6 +215,7 @@ const updatePassword = async () => {
 
   isUpdatingPassword.value = true
   try {
+    const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
     const response = await fetch(`${API_URL}/api/users/me/change-password`, {
       method: 'PUT',
       headers: {
@@ -250,6 +252,7 @@ const confirmDeleteAccount = async () => {
   if (!confirmed) return
 
   try {
+    const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
     const response = await fetch(`${API_URL}/api/users/me`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token.value}` }
