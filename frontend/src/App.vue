@@ -33,6 +33,11 @@
         <span>Інвентар</span>
       </router-link>
 
+      <router-link to="/settings" class="nav-item" active-class="active">
+        <Settings :size="24" />
+        <span>Налаштування</span>
+      </router-link>
+
     </nav>
   </div>
 </template>
@@ -40,7 +45,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue' // Додано хуки
 import { useRoute } from 'vue-router'
-import { WifiOff, LayoutDashboard, Activity, Archive } from 'lucide-vue-next'
+import { WifiOff, LayoutDashboard, Activity, Archive, Settings } from 'lucide-vue-next'
 
 const route = useRoute()
 

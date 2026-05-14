@@ -35,6 +35,14 @@ class UserUpdate(BaseModel):
     weight_kg: Optional[float] = Field(None, gt=30, example=85.0)
     position: Optional[str] = Field(None, description="PG, SG, SF, PF, C", example="SG")
 
+# Схеми для налаштувань
+class PasswordChange(BaseModel):
+    old_password: str = Field(..., description="Поточний пароль")
+    new_password: str = Field(..., description="Новий пароль")
+
+class EmailChange(BaseModel):
+    new_email: str = Field(..., description="Нова електронна адреса")
+
 # Схема для того, що сервер віддасть назад (додасться ID, АЛЕ БЕЗ ПАРОЛЯ)
 class UserResponse(UserBase):
     user_id: int
@@ -59,7 +67,6 @@ class ShoeResponse(BaseModel):
 
     class Config:
         from_attributes = True  
-
 
 # Схеми щоденних метрик(тренувань)
 class MetricCreate(BaseModel):
@@ -101,4 +108,4 @@ class UserWithDetails(UserBase):
     days_in_system: int = 0
 
     class Config:
-        from_attributes = True      
+        from_attributes = True

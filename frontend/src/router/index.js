@@ -31,6 +31,11 @@ const router = createRouter({
       path: '/gear',
       name: 'gear',
       component: () => import('../views/GearView.vue')
+    },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('../views/SettingsView.vue')
     }
   ]
 })

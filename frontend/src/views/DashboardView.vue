@@ -349,18 +349,37 @@ const cancelEditing = () => { isEditing.value = false }
 const saveProfile = async () => {
   try {
     const API_URL = import.meta.env.VITE_API_URL;
+    
+    const payload = {
+      name: editForm.value.name,
+      age: Number(editForm.value.age),
+      height_cm: Number(editForm.value.height_cm),
+      weight_kg: Number(editForm.value.weight_kg),
+      position: editForm.value.position
+    };
+
     const response = await fetch(`${API_URL}/api/users/${userId.value}`, {
+      method: 'PUT',
       headers: { 
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token.value}`
       }, 
-      body: JSON.stringify(editForm.value)
-    })
-    if (!response.ok) throw new Error('Помилка оновлення')
-    await userStore.fetchUser()
-    isEditing.value = false 
+      body: JSON.stringify(payload)
+    });
+
+    const responseData = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      console.error("Бекенд відхилив запит:", responseData);
+      throw new Error('Помилка оновлення');
+    }
+
+    await userStore.fetchUser();
+    isEditing.value = false; 
+    
   } catch (error) {
-    alert('Не вдалося зберегти зміни.')
+    console.error("Деталі помилки збереження:", error);
+    alert('Не вдалося зберегти зміни.');
   }
 }
 

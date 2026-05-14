@@ -144,6 +144,45 @@ def login_user(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
         "name": user.name, 
         "access_token": access_token
     }
+    
+# Маршрут для зміни пароля
+@app.put("/api/users/me/change-password")
+def change_password(
+    pass_data: schemas.PasswordChange, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    if not verify_password(pass_data.old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Старий пароль невірний")
+    
+    current_user.password_hash = get_password_hash(pass_data.new_password)
+    db.commit()
+    return {"message": "Пароль успішно змінено"}  
+
+# Маршрут для зміни Email
+@app.put("/api/users/me/change-email")
+def change_email(
+    email_data: schemas.EmailChange, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    user_check = db.query(models.User).filter(models.User.email == email_data.new_email).first()
+    if user_check:
+        raise HTTPException(status_code=400, detail="Цей Email вже використовується")
+    
+    current_user.email = email_data.new_email
+    db.commit()
+    return {"message": "Email змінено"}
+
+# Маршрут для видалення акаунта 
+@app.delete("/api/users/me")
+def delete_account(
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    db.delete(current_user)
+    db.commit()
+    return {"message": "Акаунт видалено назавжди"}
 
 @app.get("/api/users/{user_id}", response_model=schemas.UserWithDetails)
 def get_user(user_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
