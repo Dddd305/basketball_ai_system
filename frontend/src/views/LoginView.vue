@@ -150,7 +150,8 @@ const login = async () => {
 
   // Стандартний логін
   try {
-    const response = await fetch('https://basketball-api-kyiv.onrender.com/api/users/login', {
+    const API_URL = import.meta.env.VITE_API_URL;
+    const response = await fetch(`${API_URL}/api/users/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials.value)

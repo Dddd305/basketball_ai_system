@@ -192,8 +192,12 @@
         </div>
         <div class="stat-card border-orange">
           <p class="label">Статус (ШІ)</p>
-          <p class="value" :class="{'text-danger': currentRiskStatus.includes('Danger'), 'text-success': currentRiskStatus.includes('Optimal')}">
-            {{ currentRiskStatus.split(' ')[0] }}
+          <p class="value" :class="{
+            'text-danger': user?.fatigue_risk === 'High Danger', 
+            'text-warning': user?.fatigue_risk === 'Moderate Risk',
+            'text-success': user?.fatigue_risk === 'Optimal'
+          }">
+            {{ currentRiskStatus }}
           </p>
         </div>
       </div>
@@ -210,16 +214,16 @@
           </button>
         </div>
 
-        <div v-if="user.plans && user.plans.length > 0">
+        <div v-if="currentPlan">
           <div class="ai-focus">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
               <p class="label">Фокус тренування:</p>
-              <p class="label" style="font-weight: bold; color: #ff9800;">План від: {{ formatDate(user.plans[user.plans.length - 1].date) }}</p>
+              <p class="label" style="font-weight: bold; color: #ff9800;">План від: {{ formatDate(currentPlan.date) }}</p>
             </div>
-            <p class="value">{{ user.plans[user.plans.length - 1].plan_focus }}</p>
+            <p class="value">{{ currentPlan.plan_focus }}</p>
           </div>
           <p class="ai-content">
-            {{ user.plans[user.plans.length - 1].plan_content }}
+            {{ currentPlan.plan_content }}
           </p>
         </div>
         <div v-else class="empty-text">
@@ -304,9 +308,18 @@ const generateDraft = () => {
 
   if (calibrationForm.value.frequency > 0) {
     const totalDays = Math.min(calibrationForm.value.frequency, 7);
-    const slots = [0, 1, 2, 3, 4, 5, 6].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < totalDays; i++) { daysArray[slots[i]].activity_type = 'Training'; }
+    const slots = [0, 1, 2, 3, 4, 5, 6];
+    
+    for (let i = slots.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [slots[i], slots[j]] = [slots[j], slots[i]]; // Міняємо елементи місцями
+    }
+  
+    for (let i = 0; i < totalDays; i++) { 
+        daysArray[slots[i]].activity_type = 'Training'; 
+    }
   }
+  
   draftDays.value = daysArray.reverse()
   calibrationStep.value = 2
 }
@@ -391,14 +404,30 @@ const totalHoursPlayed = computed(() => {
 })
 
 const averageRpe = computed(() => {
-  if (!user.value || !user.value.metrics || user.value.metrics.length === 0) return 0
-  const sum = user.value.metrics.reduce((acc, m) => acc + m.rpe_score, 0)
-  return (sum / user.value.metrics.length).toFixed(1)
-})
+  if (!user.value || !user.value.metrics || user.value.metrics.length === 0) return 0;
+  const activeDays = user.value.metrics.filter(m => m.activity_type !== 'Recovery' && m.rpe_score > 0);
+  if (activeDays.length === 0) return 0;
+  const sum = activeDays.reduce((acc, m) => acc + m.rpe_score, 0);
+  return (sum / activeDays.length).toFixed(1);
+});
 
 const currentRiskStatus = computed(() => {
-  if (!user.value || !user.value.plans || user.value.plans.length === 0) return 'Невідомо'
-  return user.value.plans[user.value.plans.length - 1].fatigue_risk
+  if (!user.value || !user.value.fatigue_risk) return 'Невідомо'
+  
+  const labels = {
+    'Optimal': 'Оптимально',
+    'Moderate Risk': 'Помірний',
+    'High Danger': 'Втома',
+    'Калібрування': 'Калібрування',
+    'Немає даних': 'Немає даних'
+  }
+  
+  return labels[user.value.fatigue_risk] || user.value.fatigue_risk
+})
+
+const currentPlan = computed(() => {
+  if (!user.value?.plans?.length) return null
+  return [...user.value.plans].sort((a, b) => b.date.localeCompare(a.date))[0];
 })
 
 // Генерація плану від ШІ
@@ -842,6 +871,7 @@ onMounted(async () => {
 .border-orange { border-left: 4px solid #ff9800; }
 
 .text-danger { color: #e65100; }
+.text-warning { color: #ffeb3b; }
 .text-success { color: #4caf50; }
 
 /* =========================================
@@ -896,6 +926,7 @@ onMounted(async () => {
   line-height: 1.6; 
   white-space: pre-line; 
   color: #b0bec5; 
+  white-space: pre-line;
 }
 
 .empty-text { 

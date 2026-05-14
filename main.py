@@ -11,6 +11,9 @@ import tensorflow as tf
 import pickle
 import numpy as np
 import random
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 # ==========================================
 # 1. ІНІЦІАЛІЗАЦІЯ ТА НАЛАШТУВАННЯ
@@ -185,31 +188,63 @@ def delete_account(
     return {"message": "Акаунт видалено назавжди"}
 
 @app.get("/api/users/{user_id}", response_model=schemas.UserWithDetails)
-def get_user(user_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.user_id != user_id:
-        raise HTTPException(status_code=403, detail="Відмовлено в доступі. Це не ваші дані!")
-        
+def get_user(user_id: int, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Користувача не знайдено")
-    
-    import datetime as dt
-    
+
     # Розрахунок Readiness Score
     sorted_metrics = sorted(user.metrics, key=lambda x: x.date)
     if not sorted_metrics:
         setattr(user, 'readiness_score', 100)
-        setattr(user, 'acwr_ratio', "0.00")
-        setattr(user, 'acwr_status', "Немає даних")
+        setattr(user, 'fatigue_risk', "Немає даних")
         return user
         
     last_metric = sorted_metrics[-1]
     sleep_points = min((last_metric.sleep_hours / 8.0) * 60, 60)
     fatigue_points = ((10 - last_metric.rpe_score) / 10.0) * 40
-    setattr(user, 'readiness_score', round(sleep_points + fatigue_points))
+    base_readiness = sleep_points + fatigue_points
+
+    # Плавний HRV модифікатор
+    if last_metric.hrv_value and last_metric.hrv_value > 0:
+        raw_hrv_mod = 1.0 + (last_metric.hrv_value - 55) * 0.005
+        base_readiness *= max(0.80, min(1.20, raw_hrv_mod))
+
+    setattr(user, 'readiness_score', min(100, round(base_readiness)))
+
+    # Живий розрахунок Fatigue Risk
+    if len(sorted_metrics) >= 7:
+        last_7 = sorted_metrics[-7:]
+        input_features = []
+        for m in last_7:
+            mult = 1.25 if m.activity_type == "Game" else 1.0
+            input_features.append([m.sleep_hours, min(10.0, m.rpe_score * mult), m.duration_minutes * mult])
+        
+        try:
+            scaled_input = scaler.transform(np.array(input_features))
+            final_input = scaled_input.reshape(1, 7, 3)
+            prediction = model.predict(final_input)
+            risk_score = float(prediction[0][0])
+
+            # Плавний HRV модифікатор для ризику
+            latest_hrv = next((m.hrv_value for m in reversed(last_7) if m.hrv_value and m.hrv_value > 0), None)
+            if latest_hrv:
+                raw_risk_mod = 1.0 - (latest_hrv - 55) * 0.008
+                risk_score *= max(0.75, min(1.25, raw_risk_mod))
+
+            # Визначаємо статус
+            if risk_score > 0.75: status = "High Danger"
+            elif risk_score > 0.4: status = "Moderate Risk"
+            else: status = "Optimal"
+            
+            setattr(user, 'fatigue_risk', status)
+        except:
+            setattr(user, 'fatigue_risk', "Помилка ШІ")
+    else:
+        setattr(user, 'fatigue_risk', "Калібрування")
 
     # Розрахунок ACWR
-    now = dt.date.today()
+    now = date.today()
     oldest_date = sorted_metrics[0].date
     days_in_system = (now - oldest_date).days + 1
     
@@ -270,7 +305,14 @@ def calibrate_user(user_id: int, days: List[schemas.CalibrationDay], db: Session
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Гравця не знайдено")
-
+    
+    dates_to_calibrate = [day.date for day in days]
+    
+    db.query(models.DailyMetric).filter(
+        models.DailyMetric.user_id == user_id,
+        models.DailyMetric.date.in_(dates_to_calibrate)
+    ).delete(synchronize_session=False)
+    
     for day_data in days:
         if day_data.activity_type != "Recovery":
             metric = models.DailyMetric(
@@ -303,20 +345,25 @@ def calibrate_user(user_id: int, days: List[schemas.CalibrationDay], db: Session
 
 @app.post("/api/users/{user_id}/metrics", response_model=schemas.MetricResponse)
 def create_metric(user_id: int, metric: schemas.MetricCreate, db: Session = Depends(get_db)):
-    # Перевірка на дублікати: якщо запис за цю дату вже є, видаляємо старий
+    # Перевірка на дублікати та виправлення зносу кросівок
     existing_metric = db.query(models.DailyMetric).filter(
         models.DailyMetric.user_id == user_id,
         models.DailyMetric.date == metric.date
     ).first()
 
     if existing_metric:
+        if existing_metric.shoe_id and existing_metric.activity_type != "Recovery":
+            old_shoe = db.query(models.ShoeInventory).filter(models.ShoeInventory.shoe_id == existing_metric.shoe_id).first()
+            if old_shoe:
+                old_shoe.current_hours_played -= existing_metric.duration_minutes / 60.0
+                old_shoe.current_hours_played = max(0.0, old_shoe.current_hours_played) # Захист від від'ємного зносу
+        
         db.delete(existing_metric)
         db.commit()
 
     new_metric = models.DailyMetric(**metric.dict(), user_id=user_id)
     db.add(new_metric)
-    
-    # Логіка зносу кросівок
+
     if metric.shoe_id and metric.activity_type != "Recovery":
         shoe = db.query(models.ShoeInventory).filter(models.ShoeInventory.shoe_id == metric.shoe_id).first()
         if shoe:
@@ -333,12 +380,8 @@ def add_shoe(user_id: int, shoe: schemas.ShoeCreate, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="Гравця не знайдено")
 
     base_hours = 80.0
-
-    weight_coeff = 1.0
-    if user.weight_kg < 80:
-        weight_coeff = 1.1
-    elif user.weight_kg > 95:
-        weight_coeff = 0.85
+    raw_weight_coeff = 1.0 - (user.weight_kg - 85) * 0.01
+    weight_coeff = max(0.75, min(1.25, raw_weight_coeff))
 
     surface_coeff = 1.0
     if shoe.surface_type == "Асфальт":
@@ -396,18 +439,25 @@ def generate_plan(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="Гравця не знайдено")
 
+    today = date.today()
+    existing_plan = db.query(models.GeneratedPlan).filter(
+        models.GeneratedPlan.user_id == user_id,
+        models.GeneratedPlan.date == today
+    ).first()
+
     metrics = sorted(user.metrics, key=lambda x: x.date)
     
+    # Якщо даних недостатньо, просто повертаємо інформаційне повідомлення (не зберігаючи в БД)
     if len(metrics) < 7:
         return models.GeneratedPlan(
             user_id=user_id,
-            date=date.today(),
+            date=today,
             fatigue_risk="Optimal",
             plan_focus="Збір даних (Калібрування)",
             plan_content=f"Для роботи нейромережі LSTM потрібно 7 днів історії. Зараз у вас {len(metrics)}/7 днів.\nПродовжуйте вносити дані!"
         )
 
-    # Підготовка часового ряду (захист від розривів у днях)
+    # Підготовка даних для LSTM
     last_date = metrics[-1].date
     metrics_dict = {m.date: m for m in metrics}
     last_7_days = []
@@ -417,91 +467,138 @@ def generate_plan(user_id: int, db: Session = Depends(get_db)):
         if target_date in metrics_dict:
             last_7_days.append(metrics_dict[target_date])
         else:
-            # Пропущений день вважається днем відновлення
             empty_metric = models.DailyMetric(sleep_hours=8.0, rpe_score=0, duration_minutes=0, activity_type="Recovery")
             last_7_days.append(empty_metric)
 
     input_features = []
     for m in last_7_days:
-        # Коефіцієнт змагального стресу: +25% до навантаження, якщо це Гра
         game_multiplier = 1.25 if m.activity_type == "Game" else 1.0
-        
         effective_rpe = min(10.0, m.rpe_score * game_multiplier)
         effective_duration = m.duration_minutes * game_multiplier
-        
         input_features.append([m.sleep_hours, effective_rpe, effective_duration])
     
     input_array = np.array(input_features)
     scaled_input = scaler.transform(input_array)
     final_input = scaled_input.reshape(1, 7, 3)
 
+    # Прогноз моделі
     if model:
         prediction = model.predict(final_input)
         risk_score = float(prediction[0][0])
     else:
         risk_score = 0.5 
 
+    # Гібридний алгоритм (плавний HRV)
+    latest_hrv = next((m.hrv_value for m in reversed(last_7_days) if m.hrv_value is not None and m.hrv_value > 0), None)
+    if latest_hrv:
+        raw_risk_mod = 1.0 - (latest_hrv - 55) * 0.008
+        risk_modifier = max(0.75, min(1.25, raw_risk_mod))
+        risk_score *= risk_modifier
+            
+    risk_score = min(1.0, max(0.0, risk_score))
+
+# Визначення статусу
     fatigue_status = "Optimal"
     if risk_score > 0.75:
         fatigue_status = "High Danger"
     elif risk_score > 0.4:
         fatigue_status = "Moderate Risk"
 
-    focus = ""
-    content = ""
+    # Бібліотека знань ШІ-Тренера
+    recovery_protocols = [
+        "Контрастний душ",
+        "Міофасціальний реліз (МФР) на фоам-ролері",
+        "Йога для баскетболістів (15 хв)",
+        "Легкий стретчинг нижньої частини тіла",
+        "Дихальна гімнастика",
+        "Масажний пістолет (ікри та квадріцепси)",
+        "Прогулянка на свіжому повітрі (20 хв)"
+    ]
 
+    low_intensity_drills = [
+        "Штрафні кидки (5 серій по 10)",
+        "Дриблінг на місці (слабка рука, 10 хв)",
+        "Form shooting (кидки однією рукою з-під кільця)",
+        "Робота ніг без м'яча на низькій швидкості",
+        "Аналіз відео (вивчення плейбуку або розбір ігор)",
+        "Кидки з місця без стрибків"
+    ]
+
+    drills_library = {
+        "PG": ["Pick-and-roll passing", "Speed dribbling", "Double crossover drills", "Floater mechanics", "Court vision passing"],
+        "SG": ["Catch and shoot (3pts)", "Coming off screens", "ISO moves", "Transition 3s", "One-dribble pull-up"],
+        "SF": ["Slash and kick", "Mid-range fadeaways", "Defensive sliding", "Wing 1-on-1 attacks", "Rebound and push"],
+        "PF": ["Post-fade moves", "Pick and pop", "Box-out drills", "Face-up drives", "Offensive put-backs"],
+        "C": ["Rim protection positioning", "Mikan drill", "Drop step moves", "Hook shots", "High-post passing"]
+    }
+    
+    warmups = ["Скакалка (3х3 хв)", "Робота з тенісним м'ячем", "Динамічна розминка", "Координаційна драбина"]
+
+    risk_percent = int(risk_score * 100)
+
+    # Генерація унікального контенту
     if fatigue_status == "High Danger":
-        focus = "Повне відновлення"
+        focus = "Повне відновлення ЦНС"
+        selected = random.sample(recovery_protocols, 3)
         content = (
-            f"ШІ зафіксував критичну втому ({int(risk_score*100)}%).\n"
-            "Сьогодні робота тільки над відновленням:\n"
-            "1. Контрастний душ або кріо-процедури.\n"
-            "2. МТФ (масажний рол) - фокус на поперек та ікри.\n"
-            "3. Повноцінний сон (9+ годин) та гідратація."
+            f"ШІ зафіксував критичний ризик втоми ({risk_percent}%).\n"
+            f"Будь-яке навантаження сьогодні підвищує ризик травми.\n\n"
+            f"Ваш протокол відновлення:\n"
+            f"1. {selected[0]}\n"
+            f"2. {selected[1]}\n"
+            f"3. {selected[2]}\n\n"
+            f"Обов'язковий мінімум сну цієї ночі: 8.5 годин."
         )
+        
     elif fatigue_status == "Moderate Risk":
-        focus = "Технічна підготовка (Low Intensity)"
+        focus = "Техніка (Low Impact)"
+        selected = random.sample(low_intensity_drills, 3)
         content = (
-            f"Ризик втоми помірний ({int(risk_score*100)}%). Уникаємо стрибків.\n"
-            "1. Суглобова розминка - 15 хв.\n"
-            "2. Штрафні кидки - 100 спроб.\n"
-            "3. Робота над слабкою рукою (дриблінг на місці) - 15 хв.\n"
-            "4. Розтяжка всього тіла."
+            f"Ризик втоми підвищений ({risk_percent}%).\n"
+            f"Тіло потребує відпочинку від ударних навантажень. Жодних стрибків чи спринтів.\n\n"
+            f"План на сьогодні:\n"
+            f"1. Суглобова розминка (10 хв)\n"
+            f"2. {selected[0]}\n"
+            f"3. {selected[1]}\n"
+            f"4. {selected[2]}"
         )
+        
     else:
-        warmups = ["Скакалка (3х3 хв)", "Робота з тенісним м'ячем (реакція)", "Динамічна розминка NBA-style"]
-        
-        drills_library = {
-            "PG": ["Pick-and-roll passing", "Deep range shooting", "Speed dribbling", "Double crossover drills"],
-            "SG": ["Catch and shoot (3pts)", "Coming off screens", "Floater development", "ISO moves"],
-            "SF": ["Slash and kick", "Mid-range fadeaways", "Defensive sliding", "Fast break finishing"],
-            "PF": ["Post-fade moves", "Pick and pop shooting", "Box-out drills", "Face-up drives"],
-            "C": ["Rim protection positioning", "Mikan drill (finishing)", "Drop step moves", "Hook shots"]
-        }
-
-        position_drills = drills_library.get(user.position, ["Загальний дриблінг", "Кидки з дистанції", "Захисна стійка"])
-        todays_warmup = random.choice(warmups)
+        position = user.position if user.position in drills_library else "PG"
+        position_drills = drills_library[position]
         selected_drills = random.sample(position_drills, min(len(position_drills), 3))
+        todays_warmup = random.choice(warmups)
         
-        focus = f"Інтенсивний розвиток ({user.position})"
+        focus = f"Інтенсивний розвиток ({position})"
         content = (
-            f"Прогноз стану: Оптимальний. Рівень ризику: {int(risk_score*100)}%.\n"
+            f"Організм повністю відновлений (Ризик: {risk_percent}%).\n"
+            f"Час для інтенсивної роботи на майданчику:\n\n"
             f"1. {todays_warmup}\n"
             f"2. {selected_drills[0]}\n"
             f"3. {selected_drills[1]}\n"
             f"4. {selected_drills[2]}\n"
-            "5. Високоінтенсивне інтервальне біг (5 хв)."
+            f"5. Заминка (5 хв легкий біг + розтяжка)"
         )
 
-    new_plan = models.GeneratedPlan(
-        user_id=user_id,
-        date=date.today(),
-        fatigue_risk=fatigue_status,
-        plan_focus=focus,
-        plan_content=content
-    )
-    
-    db.add(new_plan)
-    db.commit()
-    db.refresh(new_plan)
-    return new_plan
+
+    # 2. ЛОГІКА ЗБЕРЕЖЕННЯ/ОНОВЛЕННЯ
+    if existing_plan:
+        existing_plan.fatigue_risk = fatigue_status
+        existing_plan.plan_focus = focus
+        existing_plan.plan_content = content
+        db.commit()
+        db.refresh(existing_plan)
+        return existing_plan
+    else:
+        # Створюємо новий запис, якщо на сьогодні ще нічого немає
+        new_plan = models.GeneratedPlan(
+            user_id=user_id,
+            date=today,
+            fatigue_risk=fatigue_status,
+            plan_focus=focus,
+            plan_content=content
+        )
+        db.add(new_plan)
+        db.commit()
+        db.refresh(new_plan)
+        return new_plan

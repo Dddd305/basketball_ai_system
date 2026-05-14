@@ -43,7 +43,7 @@ class PasswordChange(BaseModel):
 class EmailChange(BaseModel):
     new_email: str = Field(..., description="Нова електронна адреса")
 
-# Схема для того, що сервер віддасть назад (додасться ID, АЛЕ БЕЗ ПАРОЛЯ)
+# Схема для авторизації/легких запитів
 class UserResponse(UserBase):
     user_id: int
 
@@ -76,6 +76,7 @@ class MetricCreate(BaseModel):
     rpe_score: int = Field(..., ge=0, le=10, description="Оцінка RPE (1-10)")
     activity_type: str = Field(..., description="Тип активності")
     shoe_id: Optional[int] = Field(None, description="ID кросівок, якщо використовувались")
+    hrv_value: Optional[float] = Field(None, description="Варіабельність серцевого ритму (необов'язково)")
 
 class MetricResponse(MetricCreate):
     metric_id: int
@@ -93,16 +94,18 @@ class PlanResponse(BaseModel):
     plan_content: str
 
     class Config:
-        from_attributes = True             
+        from_attributes = True                     
 
-# Комплексна схема(має завжди бути знизу коду)
+# Комплексна схема для Dashboard (має завжди бути знизу коду)
 class UserWithDetails(UserBase):
     user_id: int
-    metrics: List['MetricResponse'] = []
-    shoes: List['ShoeResponse'] = []
-    plans: List['PlanResponse'] = []
+    metrics: List[MetricResponse] = []
+    shoes: List[ShoeResponse] = []
+    plans: List[PlanResponse] = []
     
+    # Розрахункові поля, які додає бекенд
     readiness_score: int = 100
+    fatigue_risk: str = "Калібрування"
     acwr_ratio: str = "0.00"
     acwr_status: str = "Немає даних"
     days_in_system: int = 0

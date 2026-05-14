@@ -19,22 +19,22 @@
     <nav v-if="!hideBottomNav" class="bottom-nav">
       
       <router-link to="/dashboard" class="nav-item" active-class="active">
-        <LayoutDashboard :size="24" />
+        <LayoutDashboard :size="22" />
         <span>Головна</span>
       </router-link>
 
       <router-link to="/activity" class="nav-item" active-class="active">
-        <Activity :size="24" />
+        <Activity :size="22" />
         <span>Активність</span>
       </router-link>
 
       <router-link to="/gear" class="nav-item" active-class="active">
-        <Archive :size="24" />
+        <Archive :size="22" />
         <span>Інвентар</span>
       </router-link>
 
       <router-link to="/settings" class="nav-item" active-class="active">
-        <Settings :size="24" />
+        <Settings :size="22" />
         <span>Налаштування</span>
       </router-link>
 
@@ -109,13 +109,13 @@ button, .nav-item, .btn-primary, .btn-outline {
   padding-bottom: 70px; 
 }
 
-/* ДОДАНО: Стилі офлайн-банера */
+/* Стилі офлайн-банера */
 .offline-banner {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  background-color: #e65100; /* Темно-помаранчевий/Червоний колір небезпеки */
+  background-color: #e65100;
   color: white;
   text-align: center;
   padding: 10px;
@@ -127,11 +127,9 @@ button, .nav-item, .btn-primary, .btn-outline {
   align-items: center;
   gap: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  /* Відступ для сучасних смартфонів з камерою на екрані */
   padding-top: calc(10px + env(safe-area-inset-top));
 }
 
-/* Анімація появи банера зверху */
 .slide-down-enter-active,
 .slide-down-leave-active {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
@@ -142,13 +140,14 @@ button, .nav-item, .btn-primary, .btn-outline {
   opacity: 0;
 }
 
-/* Дизайн нижньої панелі */
+/* ==========================================
+   ДИЗАЙН НИЖНЬОЇ ПАНЕЛІ (АДАПТИВНИЙ)
+   ========================================== */
 .bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 65px;
   background-color: #1e1e1e;
   border-top: 1px solid #333;
   display: flex;
@@ -156,7 +155,9 @@ button, .nav-item, .btn-primary, .btn-outline {
   align-items: center;
   z-index: 1000;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding: 8px 2px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }
 
 .nav-item {
@@ -168,8 +169,12 @@ button, .nav-item, .btn-primary, .btn-outline {
   text-decoration: none;
   font-size: 0.75rem;
   gap: 4px;
-  width: 33%;
+  flex: 1; 
+  padding: 4px 0;
   transition: all 0.3s ease;
+  white-space: nowrap; 
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nav-item svg {
@@ -187,6 +192,13 @@ button, .nav-item, .btn-primary, .btn-outline {
   transform: translateY(-2px);
 }
 
+/* Адаптація для дуже вузьких екранів */
+@media (max-width: 380px) {
+  .nav-item {
+    font-size: 0.65rem;
+  }
+}
+
 /* Плавна анімація зміни сторінок */
 .fade-enter-active,
 .fade-leave-active {
@@ -199,5 +211,10 @@ button, .nav-item, .btn-primary, .btn-outline {
 .fade-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+input, select, textarea {
+  -webkit-user-select: auto;
+  user-select: auto;
 }
 </style>

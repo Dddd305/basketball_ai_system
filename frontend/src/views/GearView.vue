@@ -158,7 +158,9 @@ const calculatedMaxLifespan = computed(() => {
   
   const base = 80.0
   const weight = user.value.weight_kg
-  const weightCoeff = weight < 80 ? 1.1 : (weight > 95 ? 0.85 : 1.0)
+  
+  let rawWeightCoeff = 1.0 - (weight - 85) * 0.01
+  const weightCoeff = Math.max(0.75, Math.min(1.25, rawWeightCoeff))
   
   const surfaceCoeff = 
     newShoe.value.surface_type === 'Асфальт' ? 0.5 : 

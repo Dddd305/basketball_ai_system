@@ -53,7 +53,11 @@
             </div>
             <div class="form-group">
               <label>HRV (мс, необов'язково):</label>
-              <input type="number" v-model="newMetric.hrv_value" step="0.1" class="input-field" />
+              <input 
+                type="number" 
+                v-model.number="newMetric.hrv_value" 
+                class="input-field" 
+              />
             </div>
           </div>
 
@@ -168,7 +172,7 @@ const newMetric = ref({
 const hasMetrics = computed(() => user.value?.metrics && user.value.metrics.length > 0)
 const sortedMetrics = computed(() => {
   if (!hasMetrics.value) return []
-  return [...user.value.metrics].sort((a, b) => new Date(b.date) - new Date(a.date))
+  return [...user.value.metrics].sort((a, b) => b.date.localeCompare(a.date))
 })
 
 watch(sortedMetrics, async () => {
@@ -242,6 +246,10 @@ const submitMetric = async () => {
   isSubmitting.value = true
   successMessage.value = ''
   const payload = { ...newMetric.value }
+
+  if (payload.hrv_value === '' || payload.hrv_value === undefined) {
+    payload.hrv_value = null;
+  }
   
   if (payload.activity_type === 'Recovery') {
     payload.duration_minutes = 0; 
