@@ -111,23 +111,41 @@
           </div>
         </div>
 
-        <div v-if="!isEditing" class="metrics-card">
-          <div class="metric-item">
-            <p class="label">Позиція</p>
-            <p class="value highlight">{{ user.position }}</p>
+        <div v-if="!isEditing" class="profile-view">
+          <div style="text-align: center; margin-bottom: 15px;">
+            <p class="label">Ім'я</p>
+            <p class="value profile-text" style="color: #fff; margin-top: 5px;">{{ user.name }}</p>
           </div>
-          <div class="metric-item border-left">
-            <p class="label">Зріст</p>
-            <p class="value">{{ user.height_cm }} <span class="unit">см</span></p>
-          </div>
-          <div class="metric-item border-left">
-            <p class="label">Вага</p>
-            <p class="value">{{ user.weight_kg }} <span class="unit">кг</span></p>
+          <div class="metrics-card" style="border-top: 1px dashed #333; padding-top: 15px;">
+            <div class="metric-item">
+              <p class="label">Вік</p>
+              <p class="value profile-text">{{ user.age }}</p>
+            </div>
+            <div class="metric-item border-left">
+              <p class="label">Позиція</p>
+              <p class="value profile-text highlight">{{ user.position }}</p>
+            </div>
+            <div class="metric-item border-left">
+              <p class="label">Зріст</p>
+              <p class="value profile-text">{{ user.height_cm }} <span class="unit">см</span></p>
+            </div>
+            <div class="metric-item border-left">
+              <p class="label">Вага</p>
+              <p class="value profile-text">{{ user.weight_kg }} <span class="unit">кг</span></p>
+            </div>
           </div>
         </div>
 
-        <div v-else class="edit-form-grid">
-          <div class="form-group">
+        <div v-else class="edit-form-grid" style="display: flex; flex-wrap: wrap; gap: 15px;">
+          <div class="form-group edit-full-width" style="flex: 1 1 100%;">
+            <label class="label">Ім'я</label>
+            <input type="text" v-model="editForm.name" class="input-field mini-input" style="text-align: left; padding-left: 15px;" />
+          </div>
+          <div class="form-group edit-half-width" style="flex: 1 1 20%; min-width: 60px;">
+            <label class="label">Вік</label>
+            <input type="number" v-model="editForm.age" class="input-field mini-input" />
+          </div>
+          <div class="form-group edit-half-width" style="flex: 1 1 20%; min-width: 60px;">
             <label class="label">Позиція</label>
             <select v-model="editForm.position" class="input-field mini-input">
               <option value="PG">PG</option>
@@ -137,11 +155,11 @@
               <option value="C">C</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group edit-half-width" style="flex: 1 1 20%; min-width: 60px;">
             <label class="label">Зріст (см)</label>
             <input type="number" v-model="editForm.height_cm" class="input-field mini-input" />
           </div>
-          <div class="form-group">
+          <div class="form-group edit-half-width" style="flex: 1 1 20%; min-width: 60px;">
             <label class="label">Вага (кг)</label>
             <input type="number" v-model="editForm.weight_kg" class="input-field mini-input" />
           </div>
@@ -350,10 +368,16 @@ const submitExactData = async () => {
 
 // --- Редагування профілю ---
 const isEditing = ref(false)
-const editForm = ref({ position: '', height_cm: 0, weight_kg: 0 })
+const editForm = ref({ name: '', age: 0, position: '', height_cm: 0, weight_kg: 0 })
 
 const startEditing = () => {
-  editForm.value = { position: user.value.position, height_cm: user.value.height_cm, weight_kg: user.value.weight_kg }
+  editForm.value = { 
+    name: user.value.name, 
+    age: user.value.age, 
+    position: user.value.position, 
+    height_cm: user.value.height_cm, 
+    weight_kg: user.value.weight_kg 
+  }
   isEditing.value = true
 }
 
@@ -363,6 +387,7 @@ const saveProfile = async () => {
   try {
     const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
     
+    // ТЕПЕР БЕРЕМО name ТА age З ФОРМИ РЕДАГУВАННЯ, АДЖЕ ВОНИ ТАМ Є
     const payload = {
       name: editForm.value.name,
       age: Number(editForm.value.age),
@@ -380,12 +405,7 @@ const saveProfile = async () => {
       body: JSON.stringify(payload)
     });
 
-    const responseData = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      console.error("Бекенд відхилив запит:", responseData);
-      throw new Error('Помилка оновлення');
-    }
+    if (!response.ok) throw new Error('Помилка оновлення');
 
     await userStore.fetchUser();
     isEditing.value = false; 
@@ -957,22 +977,116 @@ onMounted(async () => {
    АДАПТИВНІСТЬ ДЛЯ СМАРТФОНІВ
    ========================================= */
 .status-text {
-  font-size: 1.1em !important;
-  line-height: 1.2;
   word-wrap: break-word;
 }
 
 @media (max-width: 600px) {
-  .stats-grid {
-    flex-wrap: wrap;
+  .header {
+    padding-bottom: 10px !important;
+    margin-bottom: 15px !important;
   }
-  
+
+  .header-title {
+    font-size: 1.2em !important;
+  }
+
+  .btn-outline {
+    padding: 4px 10px !important;
+    font-size: 0.8em !important;
+  }
+
   .stat-card {
-    flex: 1 1 45%;
+    padding: 12px 8px !important; 
   }
   
+  .stat-card .label {
+    font-size: 0.6em !important; 
+  }
+  
+  .stat-card .value,
+  .status-text {
+    font-size: 0.95em !important; 
+  }
+
   .science-grid {
-    flex-direction: column;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 10px !important;
+  }
+
+  .science-card {
+    padding: 12px 8px !important;
+  }
+
+  .science-card .section-title {
+    font-size: 0.75em !important; 
+    margin-bottom: 6px !important;
+  }
+
+  .readiness-score, .acwr-score { 
+    font-size: 1.4em !important; 
+    margin: 4px 0 !important; 
+  }
+
+  .science-hint {
+    font-size: 0.6em !important;
+  }
+
+  .ai-card {
+    padding: 16px !important;
+  }
+
+  .ai-header h2 {
+    font-size: 1.05em !important;
+  }
+
+  .btn-ai {
+    padding: 6px 12px !important;
+    font-size: 0.8em !important;
+  }
+
+  .ai-focus {
+    padding: 10px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .ai-focus .label {
+    font-size: 0.75em !important;
+  }
+
+  .ai-content {
+    font-size: 0.85em !important;
+    line-height: 1.5 !important;
+  }
+
+  .metrics-card .value {
+    font-size: 1.2em !important; 
+  }
+
+  .ai-focus .value {
+    font-size: 1.05em !important; 
+    line-height: 1.3;
+  }
+
+  .profile-text {
+    font-size: 1.1em !important;
+  }
+
+  .edit-form-grid {
+    flex-direction: row !important; /* Тримаємо в рядок, але з переносом */
+    gap: 10px !important;
+  }
+  
+  .edit-form-grid .edit-full-width {
+    flex: 1 1 100% !important; /* Ім'я на весь рядок */
+  }
+
+  .edit-form-grid .form-group {
+    width: 100%;
+  }
+
+  .edit-form-grid .edit-half-width {
+    flex: 1 1 45% !important; /* Інші поля по 2 в ряд */
   }
 }
 </style>
