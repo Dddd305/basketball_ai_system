@@ -192,7 +192,7 @@
         </div>
         <div class="stat-card border-orange">
           <p class="label">Статус (ШІ)</p>
-          <p class="value" :class="{
+          <p class="value status-text" :class="{
             'text-danger': user?.fatigue_risk === 'High Danger', 
             'text-warning': user?.fatigue_risk === 'Moderate Risk',
             'text-success': user?.fatigue_risk === 'Optimal'
@@ -926,7 +926,6 @@ onMounted(async () => {
   line-height: 1.6; 
   white-space: pre-line; 
   color: #b0bec5; 
-  white-space: pre-line;
 }
 
 .empty-text { 
@@ -945,7 +944,6 @@ onMounted(async () => {
   justify-content: space-between; 
 }
 
-/* --- Кольорові бейджі для Select --- */
 .badge {
   font-weight: bold;
   font-size: 0.9em;
@@ -955,4 +953,26 @@ onMounted(async () => {
 .badge.training { color: #fff; background: rgba(255, 255, 255, 0.1); }
 .badge.game { color: #ff9800; background: rgba(255, 152, 0, 0.1); }
 
+/* =========================================
+   АДАПТИВНІСТЬ ДЛЯ СМАРТФОНІВ
+   ========================================= */
+.status-text {
+  font-size: 1.1em !important;
+  line-height: 1.2;
+  word-wrap: break-word;
+}
+
+@media (max-width: 600px) {
+  .stats-grid {
+    flex-wrap: wrap;
+  }
+  
+  .stat-card {
+    flex: 1 1 45%;
+  }
+  
+  .science-grid {
+    flex-direction: column;
+  }
+}
 </style>
