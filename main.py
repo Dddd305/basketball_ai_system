@@ -246,11 +246,11 @@ def get_user(
                 risk_score *= max(0.75, min(1.25, raw_risk_mod))
 
             # Визначаємо статус
-            if risk_score > 0.75: status = "High Danger"
-            elif risk_score > 0.4: status = "Moderate Risk"
-            else: status = "Optimal"
+            if risk_score > 0.75: fatigue_label = "High Danger"
+            elif risk_score > 0.4: fatigue_label = "Moderate Risk"
+            else: fatigue_label = "Optimal"
             
-            setattr(user, 'fatigue_risk', status)
+            setattr(user, 'fatigue_risk', fatigue_label)
         except:
             setattr(user, 'fatigue_risk', "Помилка ШІ")
     else:
@@ -263,36 +263,30 @@ def get_user(
     
     setattr(user, 'days_in_system', days_in_system)
     
-    acute_load = 0
-    chronic_load_total = 0
+    acute_days = [m for m in sorted_metrics if (now - m.date).days <= 6]   # 7-денне вікно (включно з сьогодні)
+    chronic_days = [m for m in sorted_metrics if (now - m.date).days <= 27] # 28-денне вікно
     
-    for m in sorted_metrics:
-        diff_days = (now - m.date).days
-        daily_load = m.duration_minutes * m.rpe_score
-        
-        if diff_days <= 7:
-            acute_load += daily_load
-        if diff_days <= 28:
-            chronic_load_total += daily_load
-            
+    acute_load_total = sum(m.duration_minutes * m.rpe_score for m in acute_days)
+    chronic_load_total = sum(m.duration_minutes * m.rpe_score for m in chronic_days)
+    
     weeks_in_system = min(4, max(1, math.ceil(days_in_system / 7.0)))
-    chronic_load = chronic_load_total / weeks_in_system
+    chronic_load_avg = chronic_load_total / weeks_in_system if weeks_in_system else 0
     
-    if chronic_load == 0:
-        ratio = "2.00" if acute_load > 0 else "0.00"
+    if chronic_load_avg == 0:
+        ratio = "2.00" if acute_load_total > 0 else "0.00"
     else:
-        ratio = f"{(acute_load / chronic_load):.2f}"
+        ratio = f"{(acute_load_total / chronic_load_avg):.2f}"
         
     setattr(user, 'acwr_ratio', ratio)
     
     val = float(ratio)
-    if val == 0: status_text = "Немає даних"
-    elif val < 0.8: status_text = "Недотренованість"
-    elif val <= 1.3: status_text = "Оптимальна зона"
-    elif val <= 1.5: status_text = "Зона ризику"
-    else: status_text = "Небезпека травми"
+    if val == 0: acwr_label = "Немає даних"
+    elif val < 0.8: acwr_label = "Недотренованість"
+    elif val <= 1.3: acwr_label = "Оптимальна зона"
+    elif val <= 1.5: acwr_label = "Зона ризику"
+    else: acwr_label = "Небезпека травми"
     
-    setattr(user, 'acwr_status', status_text)
+    setattr(user, 'acwr_status', acwr_label)
 
     return user
 

@@ -135,7 +135,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { Archive, Loader2, Trash2 } from 'lucide-vue-next'
+import { Archive, Loader2 } from 'lucide-vue-next'
 import { useUserStore } from '../stores/userStore' 
 import { storeToRefs } from 'pinia'
 
