@@ -12,6 +12,7 @@ import pickle
 import numpy as np
 import random
 import warnings
+import math
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -262,7 +263,6 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
         if diff_days <= 28:
             chronic_load_total += daily_load
             
-    import math
     weeks_in_system = min(4, max(1, math.ceil(days_in_system / 7.0)))
     chronic_load = chronic_load_total / weeks_in_system
     
@@ -364,7 +364,6 @@ def create_metric(user_id: int, metric: schemas.MetricCreate, db: Session = Depe
 
     new_metric = models.DailyMetric(**metric.dict(), user_id=user_id)
     db.add(new_metric)
-    
     if metric.shoe_id and metric.activity_type != "Recovery":
         shoe = db.query(models.ShoeInventory).filter(models.ShoeInventory.shoe_id == metric.shoe_id).first()
         if shoe:
@@ -451,8 +450,8 @@ def generate_plan(user_id: int, db: Session = Depends(get_db)):
     
     # Якщо даних недостатньо, просто повертаємо інформаційне повідомлення (не зберігаючи в БД)
     if len(metrics) < 7:
-        return models.GeneratedPlan(
-            user_id=user_id,
+        return schemas.PlanResponse(
+            plan_id=0,
             date=today,
             fatigue_risk="Optimal",
             plan_focus="Збір даних (Калібрування)",
@@ -480,14 +479,13 @@ def generate_plan(user_id: int, db: Session = Depends(get_db)):
         input_features.append([m.sleep_hours, effective_rpe, effective_duration])
     
     input_array = np.array(input_features)
-    scaled_input = scaler.transform(input_array)
-    final_input = scaled_input.reshape(1, 7, 3)
 
-    # Прогноз моделі
-    if model:
-        prediction = model.predict(final_input)
+    if model is not None and scaler is not None:
+        scaled_input = scaler.transform(input_array)
+        final_input = scaled_input.reshape(1, 7, 3)
+        prediction = model.predict(final_input, verbose=0)
         risk_score = float(prediction[0][0])
-    else:
+    else:   
         risk_score = 0.5 
 
     # Гібридний алгоритм (плавний HRV)
@@ -496,15 +494,17 @@ def generate_plan(user_id: int, db: Session = Depends(get_db)):
         raw_risk_mod = 1.0 - (latest_hrv - 55) * 0.008
         risk_modifier = max(0.75, min(1.25, raw_risk_mod))
         risk_score *= risk_modifier
-            
-    risk_score = min(1.0, max(0.0, risk_score))
+    
+    # Обмеження значення ризику в межах [0, 1]        
+    risk_score = max(0.0, min(risk_score, 1.0))
 
-# Визначення статусу
-    fatigue_status = "Optimal"
+    # Класифікація рівня ризику за трипороговою шкалою
     if risk_score > 0.75:
         fatigue_status = "High Danger"
-    elif risk_score > 0.4:
+    elif risk_score > 0.40:
         fatigue_status = "Moderate Risk"
+    else:
+        fatigue_status = "Optimal"
 
     # Бібліотека знань ШІ-Тренера
     recovery_protocols = [

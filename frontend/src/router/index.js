@@ -41,14 +41,13 @@ const router = createRouter({
 })
 
 // Захист маршрутів: дозволяється доступ до /login та /register без авторизації
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, from) => {
   const isAuthenticated = localStorage.getItem('userId')
   
   if (to.name !== 'login' && to.name !== 'register' && !isAuthenticated) {
-    next({ name: 'login' })
-  } else {
-    next()
+    return { name: 'login' }
   }
+  return true // Дозволяє перехід
 })
 
 export default router

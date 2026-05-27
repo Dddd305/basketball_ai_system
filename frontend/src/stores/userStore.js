@@ -68,12 +68,15 @@ export const useUserStore = defineStore('user', {
     },
 
     logout() {
-      this.user = null
-      this.userId = null
-      this.token = null
-      localStorage.removeItem('userId')
-      localStorage.removeItem('token')
-      localStorage.removeItem(`user_data_${this.userId}`)
+      const cachedKey = `user_data_${this.userId}`;
+      
+      this.user = null;
+      this.userId = null;
+      this.token = null;
+      
+      localStorage.removeItem('userId');
+      localStorage.removeItem('token');
+      localStorage.removeItem(cachedKey);
     }
   }
 })
