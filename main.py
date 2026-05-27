@@ -90,7 +90,12 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            token, 
+            SECRET_KEY, 
+            algorithms=[ALGORITHM],
+            options={"require": ["exp", "sub"]}
+        )
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
@@ -189,7 +194,14 @@ def delete_account(
     return {"message": "Акаунт видалено назавжди"}
 
 @app.get("/api/users/{user_id}", response_model=schemas.UserWithDetails)
-def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(
+    user_id: int, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Користувача не знайдено")
@@ -285,7 +297,15 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     return user
 
 @app.put("/api/users/{user_id}", response_model=schemas.UserResponse)
-def update_user(user_id: int, user_update: schemas.UserUpdate, db: Session = Depends(get_db)):
+def update_user(
+    user_id: int, 
+    user_update: schemas.UserUpdate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.user_id != user_id:                               
+        raise HTTPException(status_code=403, detail="Доступ заборонено")
+
     db_user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Гравця не знайдено")
@@ -301,7 +321,15 @@ def update_user(user_id: int, user_update: schemas.UserUpdate, db: Session = Dep
     return db_user
 
 @app.post("/api/users/{user_id}/calibrate", response_model=schemas.UserWithDetails)
-def calibrate_user(user_id: int, days: List[schemas.CalibrationDay], db: Session = Depends(get_db)):
+def calibrate_user(
+    user_id: int, 
+    days: List[schemas.CalibrationDay], 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Доступ заборонено") 
+
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Гравця не знайдено")
@@ -344,8 +372,15 @@ def calibrate_user(user_id: int, days: List[schemas.CalibrationDay], db: Session
 # ==========================================
 
 @app.post("/api/users/{user_id}/metrics", response_model=schemas.MetricResponse)
-def create_metric(user_id: int, metric: schemas.MetricCreate, db: Session = Depends(get_db)):
-    
+def create_metric(
+    user_id: int, 
+    metric: schemas.MetricCreate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)  
+):
+    if current_user.user_id != user_id:                     
+        raise HTTPException(status_code=403, detail="Доступ заборонено")
+        
     existing_metrics = db.query(models.DailyMetric).filter(
         models.DailyMetric.user_id == user_id,
         models.DailyMetric.date == metric.date
@@ -374,7 +409,15 @@ def create_metric(user_id: int, metric: schemas.MetricCreate, db: Session = Depe
     return new_metric
 
 @app.post("/api/users/{user_id}/shoes", response_model=schemas.ShoeResponse)
-def add_shoe(user_id: int, shoe: schemas.ShoeCreate, db: Session = Depends(get_db)):
+def add_shoe(
+    user_id: int, 
+    shoe: schemas.ShoeCreate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Доступ заборонено")
+
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Гравця не знайдено")
@@ -412,10 +455,18 @@ def add_shoe(user_id: int, shoe: schemas.ShoeCreate, db: Session = Depends(get_d
     return new_shoe
 
 @app.delete("/api/shoes/{shoe_id}")
-def delete_shoe(shoe_id: int, db: Session = Depends(get_db)):
+def delete_shoe(
+    shoe_id: int, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
     shoe = db.query(models.ShoeInventory).filter(models.ShoeInventory.shoe_id == shoe_id).first()
     if not shoe:
         raise HTTPException(status_code=404, detail="Кросівки не знайдено")
+        
+    if shoe.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Доступ заборонено")
+        
     db.delete(shoe)
     db.commit()
     return {"status": "success"}
@@ -435,7 +486,14 @@ except Exception as e:
     scaler = None
 
 @app.post("/api/ai/generate_plan/{user_id}", response_model=schemas.PlanResponse)
-def generate_plan(user_id: int, db: Session = Depends(get_db)):
+def generate_plan(
+    user_id: int, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Доступ заборонено")
+
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Гравця не знайдено")
