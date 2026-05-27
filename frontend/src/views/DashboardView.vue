@@ -107,7 +107,10 @@
           </button>
           <div v-else class="edit-actions">
             <button @click="cancelEditing" class="btn-text" style="color: #b0bec5;">Скасувати</button>
-            <button @click="saveProfile" class="btn-text" style="color: #4caf50; font-weight: bold;">Зберегти</button>
+            <button @click="saveProfile" :disabled="isSavingProfile" class="btn-text" style="color: #4caf50; font-weight: bold; display: flex; align-items: center;">
+              <Loader2 v-if="isSavingProfile" class="animate-spin" :size="14" style="margin-right: 4px;" />
+              {{ isSavingProfile ? 'Зберігаю...' : 'Зберегти' }}
+            </button>
           </div>
         </div>
 
@@ -312,9 +315,9 @@ const generateDraft = () => {
   const today = new Date()
   const daysArray = []
 
-  for (let i = 0; i < 7; i++) {
+  for (let offset = 6; offset >= 0; offset--) {
     const d = new Date(today)
-    d.setDate(d.getDate() - i)
+    d.setDate(today.getDate() - offset)
     daysArray.push({
       date: getLocalDateString(d),
       activity_type: 'Recovery', 
@@ -323,22 +326,21 @@ const generateDraft = () => {
       sleep_hours: calibrationForm.value.sleep_hours
     })
   }
-
+  // Алгоритм Фішера-Єйтса
   if (calibrationForm.value.frequency > 0) {
     const totalDays = Math.min(calibrationForm.value.frequency, 7);
-    const slots = [0, 1, 2, 3, 4, 5, 6];
-    
+    const slots = [0, 1, 2, 3, 4, 5, 6];   
+    // Тасування
     for (let i = slots.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [slots[i], slots[j]] = [slots[j], slots[i]]; // Міняємо елементи місцями
-    }
-  
+        [slots[i], slots[j]] = [slots[j], slots[i]];
+    } 
+    // Призначення тренувань
     for (let i = 0; i < totalDays; i++) { 
         daysArray[slots[i]].activity_type = 'Training'; 
     }
   }
-  
-  draftDays.value = daysArray.reverse()
+  draftDays.value = daysArray
   calibrationStep.value = 2
 }
 
@@ -368,6 +370,7 @@ const submitExactData = async () => {
 
 // --- Редагування профілю ---
 const isEditing = ref(false)
+const isSavingProfile = ref(false)
 const editForm = ref({ name: '', age: 0, position: '', height_cm: 0, weight_kg: 0 })
 
 const startEditing = () => {
@@ -384,10 +387,10 @@ const startEditing = () => {
 const cancelEditing = () => { isEditing.value = false }
 
 const saveProfile = async () => {
+  isSavingProfile.value = true
   try {
     const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
     
-    // ТЕПЕР БЕРЕМО name ТА age З ФОРМИ РЕДАГУВАННЯ, АДЖЕ ВОНИ ТАМ Є
     const payload = {
       name: editForm.value.name,
       age: Number(editForm.value.age),
@@ -413,6 +416,8 @@ const saveProfile = async () => {
   } catch (error) {
     console.error("Деталі помилки збереження:", error);
     alert('Не вдалося зберегти зміни.');
+  } finally {
+    isSavingProfile.value = false
   }
 }
 
@@ -1073,12 +1078,12 @@ onMounted(async () => {
   }
 
   .edit-form-grid {
-    flex-direction: row !important; /* Тримаємо в рядок, але з переносом */
+    flex-direction: row !important;
     gap: 10px !important;
   }
   
   .edit-form-grid .edit-full-width {
-    flex: 1 1 100% !important; /* Ім'я на весь рядок */
+    flex: 1 1 100% !important;
   }
 
   .edit-form-grid .form-group {
@@ -1086,7 +1091,7 @@ onMounted(async () => {
   }
 
   .edit-form-grid .edit-half-width {
-    flex: 1 1 45% !important; /* Інші поля по 2 в ряд */
+    flex: 1 1 45% !important;
   }
 }
 </style>

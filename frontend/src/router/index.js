@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(import.meta.env.BASE_URL || '/'),
   routes: [
     {
       path: '/',
@@ -13,7 +13,6 @@ const router = createRouter({
     {
       path: '/register',
       name: 'register',
-      // Lazy loading для сторінки реєстрації
       component: () => import('../views/RegisterView.vue'),
       meta: { hideBottomNav: true }
     },
@@ -36,18 +35,30 @@ const router = createRouter({
       path: '/settings',
       name: 'settings',
       component: () => import('../views/SettingsView.vue')
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      redirect: { name: 'dashboard' }
     }
   ]
 })
 
-// Захист маршрутів: дозволяється доступ до /login та /register без авторизації
+const GUEST_ROUTES = ['login', 'register']
+
 router.beforeEach((to, from) => {
-  const isAuthenticated = localStorage.getItem('userId')
+  const isAuthenticated = !!localStorage.getItem('userId')
+  const isGuestRoute = GUEST_ROUTES.includes(to.name)
   
-  if (to.name !== 'login' && to.name !== 'register' && !isAuthenticated) {
+  if (!isGuestRoute && !isAuthenticated) {
     return { name: 'login' }
   }
-  return true // Дозволяє перехід
+  
+  if (isGuestRoute && isAuthenticated) {
+    return { name: 'dashboard' }
+  }
+
+  return true
 })
 
 export default router

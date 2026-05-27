@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia'
 
-
 export const useUserStore = defineStore('user', {
   state: () => ({
     user: null,
     userId: localStorage.getItem('userId') || null,
     token: localStorage.getItem('token') || null,
     loading: false,
-    error: null
+    error: null,
+    _fetchController: null
   }),
 
   getters: {
@@ -23,41 +23,61 @@ export const useUserStore = defineStore('user', {
       this.error = null
 
       // Офлайн-кеш (миттєве завантаження)
-      const cachedData = localStorage.getItem(`user_data_${this.userId}`)
+      const cachedKey = `user_data_${this.userId}`
+      const cachedData = localStorage.getItem(cachedKey)
       if (cachedData) {
-        this.user = JSON.parse(cachedData)
-      }
-
-      // Оновлення з сервера (з JWT токеном)
-      if (navigator.onLine) {
         try {
-           const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
-           const response = await fetch(`${API_URL}/api/users/${this.userId}`, {
-            headers: {
-                'Authorization': `Bearer ${this.token}`,
-                'Content-Type': 'application/json'
-            }
-          })
-
-          if (response.status === 401) {
-            throw new Error('Токен протерміновано')
-          }
-
-          if (!response.ok) throw new Error('Помилка мережі')
-
-          const freshUser = await response.json()
-          this.user = freshUser
-          
-          // Оновлення кешу
-          localStorage.setItem(`user_data_${this.userId}`, JSON.stringify(freshUser))
-        } catch (error) {
-          console.error('Помилка синхронізації:', error.message)
-          if (error.message === 'Токен протерміновано') {
-            this.logout() // Автоматичний вихід, якщо токен більше не дійсний
-          }
+          this.user = JSON.parse(cachedData)
+        } catch {
+          localStorage.removeItem(cachedKey) // Видалення пошкодженного кешу
         }
       }
-      this.loading = false
+
+      // Якщо немає інтернету - зупинка, показ кешу
+      if (!navigator.onLine) {
+        this.loading = false
+        return
+      }
+
+      if (this._fetchController) {
+        this._fetchController.abort()
+      }
+      this._fetchController = new AbortController()
+
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
+        const response = await fetch(`${API_URL}/api/users/${this.userId}`, {
+          signal: this._fetchController.signal,
+          headers: {
+            'Authorization': `Bearer ${this.token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.status === 401) {
+          throw new Error('Токен протерміновано')
+        }
+
+        if (!response.ok) throw new Error('Помилка мережі')
+
+        const freshUser = await response.json()
+        this.user = freshUser
+        
+        // Оновлення кешу
+        localStorage.setItem(cachedKey, JSON.stringify(freshUser))
+
+      } catch (error) {
+        if (error.name === 'AbortError') return
+        
+        console.error('Помилка синхронізації:', error.message)
+        this.error = error.message
+
+        if (error.message === 'Токен протерміновано') {
+          this.logout() // Автоматичний вихід
+        }
+      } finally {
+        this.loading = false
+      }
     },
 
     setAuthData(userId, token) {

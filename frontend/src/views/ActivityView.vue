@@ -175,17 +175,16 @@ const sortedMetrics = computed(() => {
   return [...user.value.metrics].sort((a, b) => b.date.localeCompare(a.date))
 })
 
-watch([sortedMetrics, user], async () => {
-  if (user.value) {
-  await nextTick() // Чекає, поки DOM оновиться
-  renderChart()
+
+watch([sortedMetrics, loading], async ([newMetrics, isLoading]) => {
+  if (isLoading) return;
+  await nextTick();   
+  if (chartCanvas.value && hasMetrics.value) {
+    renderChart();
   }
 }, { deep: true, immediate: true })
 
-/**
- * @function renderChart
- * @description Відмальовує гістограму навантажень за останні 7 днів за допомогою Chart.js.
- */
+
 const renderChart = () => {
   if (!hasMetrics.value || !chartCanvas.value) return
   
@@ -235,10 +234,6 @@ const renderChart = () => {
   })
 }
 
-/**
- * @function submitMetric
- * @description Відправляє тренування на сервер із JWT токеном.
- */
 const submitMetric = async () => {
   if (!navigator.onLine) {
     alert('Відсутнє підключення до Інтернету. Збереження нового тренування наразі недоступне.')
@@ -247,10 +242,15 @@ const submitMetric = async () => {
 
   isSubmitting.value = true
   successMessage.value = ''
-  const payload = { ...newMetric.value }
+  
+  const sanitizeNumeric = (val) => {
+    const num = Number(val)
+    return (!val && val !== 0) || isNaN(num) ? null : num
+  }
 
-  if (payload.hrv_value === '' || payload.hrv_value === undefined) {
-    payload.hrv_value = null;
+  const payload = { 
+    ...newMetric.value,
+    hrv_value: sanitizeNumeric(newMetric.value.hrv_value)
   }
   
   if (payload.activity_type === 'Recovery') {
@@ -311,7 +311,7 @@ const exportToCSV = () => {
     m.hrv_value || ''
   ]);
   
-  const csvContent = [
+  const csvContent = '\uFEFF' + [
     headers.join(','), 
     ...rows.map(row => row.join(','))
   ].join('\n');
@@ -325,6 +325,10 @@ const exportToCSV = () => {
   document.body.appendChild(link); 
   link.click(); 
   document.body.removeChild(link);
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url)
+  }, 150)
 }
 
 const translateActivity = (type) => {

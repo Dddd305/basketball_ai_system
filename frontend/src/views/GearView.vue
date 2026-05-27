@@ -85,6 +85,12 @@
           <button type="submit" :disabled="isAddingShoe" class="btn-primary">
             {{ isAddingShoe ? 'Зберігаю...' : '+ Додати в інвентар' }}
           </button>
+          <transition name="fade">
+            <div v-if="addSuccessMessage" class="alert-success" style="margin-top: 15px; display: flex; align-items: center; gap: 10px; color: #4caf50; background: rgba(76, 175, 80, 0.1); padding: 12px 16px; border-radius: 8px; border: 1px solid rgba(76, 175, 80, 0.2); font-weight: 500;">
+              <span>✓</span>
+              <span>{{ addSuccessMessage }}</span>
+            </div>
+          </transition>
         </form>
       </div>
 
@@ -174,18 +180,22 @@ const calculatedMaxLifespan = computed(() => {
 
 const calculatedCurrentHours = computed({
   get: () => {
-    return Math.round((newShoe.value.initial_wear_percentage / 100) * calculatedMaxLifespan.value)
+    const raw = (newShoe.value.initial_wear_percentage / 100) * calculatedMaxLifespan.value
+    return Math.round(raw * 10) / 10
   },
-  set: (val) => {
-    const safeMax = calculatedMaxLifespan.value > 0 ? calculatedMaxLifespan.value : 1;
-    let percent = (val / safeMax) * 100
-    newShoe.value.initial_wear_percentage = Math.min(100, Math.max(0, Math.round(percent)))
+  set: (inputHours) => {
+    const maxHours = calculatedMaxLifespan.value || 1
+    const clamped  = Math.max(0, Math.min(inputHours, maxHours))
+    const pct      = Math.round((clamped / maxHours) * 100)
+    newShoe.value.initial_wear_percentage = pct
   }
 })
 
 // ==========================================
 // --- МЕРЕЖЕВІ ЗАПИТИ З JWT ТОКЕНОМ ---
 // ==========================================
+
+const addSuccessMessage = ref('')
 
 const addShoe = async () => {
   // Захист офлайну
@@ -195,6 +205,8 @@ const addShoe = async () => {
   }
 
   isAddingShoe.value = true
+  addSuccessMessage.value = '' // Очищаємо попереднє повідомлення
+  
   try {
     const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
     const response = await fetch(`${API_URL}/api/users/${userId.value}/shoes`, {
@@ -210,8 +222,13 @@ const addShoe = async () => {
     
     await userStore.fetchUser()
     
+    addSuccessMessage.value = `${newShoe.value.brand_model} успішно додано до інвентарю!`
+    
     newShoe.value.brand_model = ''
     newShoe.value.initial_wear_percentage = 0
+    
+    setTimeout(() => { addSuccessMessage.value = '' }, 3000)
+    
   } catch (error) {
     alert('Не вдалося додати кросівки. Спробуйте пізніше.')
   } finally {

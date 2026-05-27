@@ -144,7 +144,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue' // ДОДАНО: імпорт watch
 import { useRouter } from 'vue-router'
 import { Settings, Mail, Lock, AlertTriangle, Trash2, Loader2, Eye, EyeOff } from 'lucide-vue-next'
 import { useUserStore } from '../stores/userStore'
@@ -153,11 +153,16 @@ import { storeToRefs } from 'pinia'
 const router = useRouter()
 const userStore = useUserStore()
 
-// Додано loading, як в GearView
 const { user, loading, userId, token } = storeToRefs(userStore)
-const API_URL = import.meta.env.VITE_API_URL
 
-const activeTab = ref('profile')
+const BASE_API = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com'
+
+const activeTab = ref(sessionStorage.getItem('settings_tab') || 'profile')
+
+watch(activeTab, (newTab) => {
+  sessionStorage.setItem('settings_tab', newTab)
+})
+
 const emailForm = ref({ new_email: '' })
 const passwordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
 
@@ -180,8 +185,7 @@ const updateEmail = async () => {
 
   isUpdatingEmail.value = true
   try {
-    const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
-    const response = await fetch(`${API_URL}/api/users/me/change-email`, {
+    const response = await fetch(`${BASE_API}/api/users/me/change-email`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -215,8 +219,7 @@ const updatePassword = async () => {
 
   isUpdatingPassword.value = true
   try {
-    const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
-    const response = await fetch(`${API_URL}/api/users/me/change-password`, {
+    const response = await fetch(`${BASE_API}/api/users/me/change-password`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -252,8 +255,7 @@ const confirmDeleteAccount = async () => {
   if (!confirmed) return
 
   try {
-    const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
-    const response = await fetch(`${API_URL}/api/users/me`, {
+    const response = await fetch(`${BASE_API}/api/users/me`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token.value}` }
     })
