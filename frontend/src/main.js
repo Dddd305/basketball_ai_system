@@ -17,7 +17,7 @@ app.mount('#app')
 // Ініціалізація Service Worker
 if ('serviceWorker' in navigator) {
   registerSW({
-    immediate: true, // Змушує додаток оновлюватися одразу, як тільки ти зміниш код
+    immediate: true, // Змушує додаток оновлюватися одразу, як тільки змінюється код
     onOfflineReady() {
       console.log('PWA: Додаток успішно закешовано. Тепер він працює без Інтернету!')
     },

@@ -30,7 +30,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://127.0.0.1:5173",
+        "http://192.168.0.106:5173/",
+        "https://basketball-api-kyiv.onrender.com"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -245,7 +250,6 @@ def get_user(
                 raw_risk_mod = 1.0 - (latest_hrv - 55) * 0.008
                 risk_score *= max(0.75, min(1.25, raw_risk_mod))
 
-            # Визначаємо статус
             if risk_score > 0.75: fatigue_label = "High Danger"
             elif risk_score > 0.4: fatigue_label = "Moderate Risk"
             else: fatigue_label = "Optimal"
@@ -330,6 +334,17 @@ def calibrate_user(
     
     dates_to_calibrate = [day.date for day in days]
     
+    old_metrics = db.query(models.DailyMetric).filter(
+        models.DailyMetric.user_id == user_id,
+        models.DailyMetric.date.in_(dates_to_calibrate)
+    ).all()
+
+    for old_m in old_metrics:
+        if old_m.shoe_id and old_m.activity_type != "Recovery":
+            shoe = db.query(models.ShoeInventory).filter(models.ShoeInventory.shoe_id == old_m.shoe_id).first()
+            if shoe:
+                shoe.current_hours_played = max(0.0, shoe.current_hours_played - (old_m.duration_minutes / 60.0))
+
     db.query(models.DailyMetric).filter(
         models.DailyMetric.user_id == user_id,
         models.DailyMetric.date.in_(dates_to_calibrate)
@@ -401,6 +416,33 @@ def create_metric(
     db.commit()
     db.refresh(new_metric)
     return new_metric
+
+@app.delete("/api/users/{user_id}/metrics/{metric_id}")
+def delete_metric(
+    user_id: int, 
+    metric_id: int, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Доступ заборонено")
+
+    metric = db.query(models.DailyMetric).filter(
+        models.DailyMetric.metric_id == metric_id,
+        models.DailyMetric.user_id == user_id
+    ).first()
+
+    if not metric:
+        raise HTTPException(status_code=404, detail="Метрику не знайдено")
+
+    if metric.shoe_id and metric.activity_type != "Recovery":
+        shoe = db.query(models.ShoeInventory).filter(models.ShoeInventory.shoe_id == metric.shoe_id).first()
+        if shoe:
+            shoe.current_hours_played = max(0.0, shoe.current_hours_played - (metric.duration_minutes / 60.0))
+
+    db.delete(metric)
+    db.commit()
+    return {"status": "success", "message": "Тренування успішно видалено"}
 
 @app.post("/api/users/{user_id}/shoes", response_model=schemas.ShoeResponse)
 def add_shoe(
@@ -500,7 +542,6 @@ def generate_plan(
 
     metrics = sorted(user.metrics, key=lambda x: x.date)
     
-    # Якщо даних недостатньо, просто повертаємо інформаційне повідомлення (не зберігаючи в БД)
     if len(metrics) < 7:
         return schemas.PlanResponse(
             plan_id=0,
@@ -546,8 +587,7 @@ def generate_plan(
         raw_risk_mod = 1.0 - (latest_hrv - 55) * 0.008
         risk_modifier = max(0.75, min(1.25, raw_risk_mod))
         risk_score *= risk_modifier
-    
-    # Обмеження значення ризику в межах [0, 1]        
+         
     risk_score = max(0.0, min(risk_score, 1.0))
 
     # Класифікація рівня ризику за трипороговою шкалою
@@ -559,31 +599,36 @@ def generate_plan(
         fatigue_status = "Optimal"
 
     # Бібліотека знань ШІ-Тренера
-    recovery_protocols = [
-        "Контрастний душ",
-        "Міофасціальний реліз (МФР) на фоам-ролері",
-        "Йога для баскетболістів (15 хв)",
-        "Легкий стретчинг нижньої частини тіла",
-        "Дихальна гімнастика",
-        "Масажний пістолет (ікри та квадріцепси)",
-        "Прогулянка на свіжому повітрі (20 хв)"
+    RECOVERY_TOOLKIT = [
+        "Контрастний душ (3х45 сек)", 
+        "Міофасціальний реліз (МФР) квадрицепсів",
+        "Йога для баскетболістів (15 хв)", 
+        "Суглобова гімнастика Бубновського",
+        "Дихальна техніка 4-7-8", 
+        "Прогулянка на свіжому повітрі (20 хв)",
+        "Масажний пістолет (м'язи гомілки)"
     ]
 
-    low_intensity_drills = [
+    LOW_IMPACT_DRILLS = [
         "Штрафні кидки (5 серій по 10)",
         "Дриблінг на місці (слабка рука, 10 хв)",
         "Form shooting (кидки однією рукою з-під кільця)",
         "Робота ніг без м'яча на низькій швидкості",
         "Аналіз відео (вивчення плейбуку або розбір ігор)",
-        "Кидки з місця без стрибків"
+        "Кидки з місця без стрибків (Catch and shoot)"
     ]
 
-    drills_library = {
-        "PG": ["Pick-and-roll passing", "Speed dribbling", "Double crossover drills", "Floater mechanics", "Court vision passing"],
-        "SG": ["Catch and shoot (3pts)", "Coming off screens", "ISO moves", "Transition 3s", "One-dribble pull-up"],
-        "SF": ["Slash and kick", "Mid-range fadeaways", "Defensive sliding", "Wing 1-on-1 attacks", "Rebound and push"],
-        "PF": ["Post-fade moves", "Pick and pop", "Box-out drills", "Face-up drives", "Offensive put-backs"],
-        "C": ["Rim protection positioning", "Mikan drill", "Drop step moves", "Hook shots", "High-post passing"]
+    POSITION_DRILL_MATRIX = {
+        "PG": {"primary": ["Speed dribbling з конусами", "Floater mechanics", "Pick-and-roll read"], 
+               "secondary": ["Court vision drills", "Double crossover"]},
+        "SG": {"primary": ["Catch-and-shoot off screens", "ISO mid-range", "One-dribble pull-up"],
+               "secondary": ["Transition 3s", "Corner 3pt precision"]},
+        "SF": {"primary": ["Wing slash-and-kick", "Fadeaway mid-range", "Wing 1-on-1 attacks"],
+               "secondary": ["Defensive close-out slides", "Rebound-and-outlet"]},
+        "PF": {"primary": ["Post-up power moves", "Pick-and-pop spacing", "Face-up drives"],
+               "secondary": ["Box-out battle drills", "Offensive put-backs"]},
+        "C":  {"primary": ["Mikan drill (обидві руки)", "Drop-step hook", "Rim protection positioning"],
+               "secondary": ["High-post two-man game", "Vertical jump timing"]}
     }
     
     warmups = ["Скакалка (3х3 хв)", "Робота з тенісним м'ячем", "Динамічна розминка", "Координаційна драбина"]
@@ -593,7 +638,7 @@ def generate_plan(
     # Генерація унікального контенту
     if fatigue_status == "High Danger":
         focus = "Повне відновлення ЦНС"
-        selected = random.sample(recovery_protocols, 3)
+        selected = random.sample(RECOVERY_TOOLKIT, 3)
         content = (
             f"ШІ зафіксував критичний ризик втоми ({risk_percent}%).\n"
             f"Будь-яке навантаження сьогодні підвищує ризик травми.\n\n"
@@ -606,7 +651,7 @@ def generate_plan(
         
     elif fatigue_status == "Moderate Risk":
         focus = "Техніка (Low Impact)"
-        selected = random.sample(low_intensity_drills, 3)
+        selected = random.sample(LOW_IMPACT_DRILLS, 3)
         content = (
             f"Ризик втоми підвищений ({risk_percent}%).\n"
             f"Тіло потребує відпочинку від ударних навантажень. Жодних стрибків чи спринтів.\n\n"
@@ -618,9 +663,13 @@ def generate_plan(
         )
         
     else:
-        position = user.position if user.position in drills_library else "PG"
-        position_drills = drills_library[position]
-        selected_drills = random.sample(position_drills, min(len(position_drills), 3))
+        position = user.position if user.position in POSITION_DRILL_MATRIX else "PG"
+        pos_data = POSITION_DRILL_MATRIX[position]
+        # 2 первинні та 1 вторинна навички для різноманітності
+        primary_drills = random.sample(pos_data["primary"], 2)
+        secondary_drill = random.sample(pos_data["secondary"], 1)
+        selected_drills = primary_drills + secondary_drill
+        
         todays_warmup = random.choice(warmups)
         
         focus = f"Інтенсивний розвиток ({position})"
@@ -635,7 +684,7 @@ def generate_plan(
         )
 
 
-    # 2. ЛОГІКА ЗБЕРЕЖЕННЯ/ОНОВЛЕННЯ
+    # Логіка збереження/оновлення
     if existing_plan:
         existing_plan.fatigue_risk = fatigue_status
         existing_plan.plan_focus = focus
@@ -644,7 +693,6 @@ def generate_plan(
         db.refresh(existing_plan)
         return existing_plan
     else:
-        # Створюємо новий запис, якщо на сьогодні ще нічого немає
         new_plan = models.GeneratedPlan(
             user_id=user_id,
             date=today,

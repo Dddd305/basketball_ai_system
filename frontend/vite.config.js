@@ -18,14 +18,12 @@ export default defineConfig({
     vue(),
     VitePWA({ 
       registerType: 'autoUpdate',
-      // Включаємо підтримку розробки (тепер PWA можна дебажити без build)
       devOptions: {
         enabled: true,
-        type: 'module' // <-- ДОДАЙ ЦЕЙ РЯДОК! Без нього dev-режим блокує PWA
+        type: 'module'
       },
-      // Налаштування стратегії кешування
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,vue}'], // Кешуємо все для офлайну
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,vue}'],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true
@@ -51,7 +49,7 @@ export default defineConfig({
             src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable' // Важливо для Android
+            purpose: 'any maskable'
           },
           {
             src: 'apple-touch-icon.png',
