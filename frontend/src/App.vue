@@ -43,7 +43,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue' // Додано хуки
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { WifiOff, LayoutDashboard, Activity, Archive, Settings } from 'lucide-vue-next'
 
@@ -63,13 +63,11 @@ const updateOnlineStatus = () => {
 }
 
 onMounted(() => {
-  // Слухаємо системні події браузера про зміну статусу мережі
   window.addEventListener('online', updateOnlineStatus)
   window.addEventListener('offline', updateOnlineStatus)
 })
 
 onUnmounted(() => {
-  // Прибираємо слухачів, якщо компонент знищується
   window.removeEventListener('online', updateOnlineStatus)
   window.removeEventListener('offline', updateOnlineStatus)
 })

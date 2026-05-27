@@ -1,41 +1,65 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import BaseModel, Field, model_validator
+from typing import Optional, List, Literal
 import datetime as dt
+from enum import Enum
 
-# Базова схема користувача (без пароля)
+# ==========================================
+# ДОМЕННІ ПЕРЕЛІКИ (ENUMS) ДЛЯ ВАЛІДАЦІЇ
+# ==========================================
+class CourtPosition(str, Enum):
+    """Баскетбольні ігрові позиції за стандартною класифікацією."""
+    PG = "PG"
+    SG = "SG"
+    SF = "SF"
+    PF = "PF"
+    C = "C"
+
+class ActivityCategory(str, Enum):
+    """Категорії щоденних фізичних активностей."""
+    TRAINING = "Training"
+    GAME = "Game"
+    RECOVERY = "Recovery"
+
+# ==========================================
+# СХЕМИ КОРИСТУВАЧА
+# ==========================================
 class UserBase(BaseModel):
     email: str = Field(..., example="player@gmail.com")
     name: str = Field(..., example="Dmytro")
     age: int = Field(..., gt=0, example=21)
     height_cm: float = Field(..., gt=100, example=188)
     weight_kg: float = Field(..., gt=30, example=80.0)
-    position: str = Field(..., description="Ігрове амплуа: PG, SG, SF, PF або C", example="PG")
+    position: CourtPosition = Field(..., description="Ігрове амплуа: PG, SG, SF, PF або C", example="PG")
 
-# Схема для реєстрації (додається пароль)
 class UserCreate(UserBase):
     password: str = Field(..., example="securepassword123")
 
-# Схема для авторизації
 class UserLogin(BaseModel):
     email: str
     password: str
     
 class CalibrationDay(BaseModel):
     date: dt.date = Field(..., description="Дата тренування/відпочинку")
-    activity_type: str = Field(..., description="Тип активності: Training, Game або Recovery")
-    duration_minutes: int = Field(0, description="Тривалість у хвилинах")
-    rpe_score: int = Field(0, description="Інтенсивність RPE (1-10)")
-    sleep_hours: float = Field(..., description="Сон цієї ночі")
+    activity_type: ActivityCategory = Field(..., description="Тип активності: Training, Game або Recovery")
+    duration_minutes: int = Field(0, ge=0, description="Тривалість у хвилинах")
+    rpe_score: int = Field(0, ge=0, le=10, description="Інтенсивність RPE (1-10)")
+    sleep_hours: float = Field(..., ge=0, le=24, description="Сон цієї ночі")
     
-# Схема для оновлення даних
+    @model_validator(mode='after')
+    def validate_recovery_consistency(self) -> 'CalibrationDay':
+        """Гарантує нульове навантаження для відновлювальних сесій."""
+        if self.activity_type == ActivityCategory.RECOVERY:
+            if self.duration_minutes > 0 or self.rpe_score > 0:
+                raise ValueError("Сесія типу 'Recovery' повинна мати duration_minutes=0 та rpe_score=0.")
+        return self
+
 class UserUpdate(BaseModel):
     name: Optional[str] = Field(None, example="Dmytro")
     age: Optional[int] = Field(None, gt=0, example=21)
     height_cm: Optional[float] = Field(None, gt=100, example=188.0)
     weight_kg: Optional[float] = Field(None, gt=30, example=85.0)
-    position: Optional[str] = Field(None, description="PG, SG, SF, PF, C", example="SG")
+    position: Optional[CourtPosition] = Field(None, description="PG, SG, SF, PF, C", example="SG")
 
-# Схеми для налаштувань
 class PasswordChange(BaseModel):
     old_password: str = Field(..., description="Поточний пароль")
     new_password: str = Field(..., description="Новий пароль")
@@ -43,18 +67,23 @@ class PasswordChange(BaseModel):
 class EmailChange(BaseModel):
     new_email: str = Field(..., description="Нова електронна адреса")
 
-# Схема для авторизації/легких запитів
 class UserResponse(UserBase):
     user_id: int
 
     class Config:
         from_attributes = True
 
-# Схеми для кросівок
+# ==========================================
+# СХЕМИ ІНВЕНТАРЮ (КРОСІВКИ)
+# ==========================================
 class ShoeCreate(BaseModel):
     brand_model: str = Field(..., example="Nike KD 17")
-    shoe_type: str = Field(..., description="Баскетбольні або Інші")
-    surface_type: str = Field(..., description="Паркет, Гума/Тартан або Асфальт")
+    shoe_type: Literal["Баскетбольні", "Інші"] = Field(
+        ..., description="Баскетбольні або Інші"
+    )
+    surface_type: Literal["Паркет", "Гума/Тартан", "Гібрид (Мікс)", "Асфальт"] = Field(
+        ..., description="Паркет, Гума/Тартан або Асфальт"
+    )
     initial_wear_percentage: int = Field(0, ge=0, le=100, description="Відсоток зносу на момент додавання")
 
 class ShoeResponse(BaseModel):
@@ -68,15 +97,30 @@ class ShoeResponse(BaseModel):
     class Config:
         from_attributes = True  
 
-# Схеми щоденних метрик(тренувань)
+# ==========================================
+# СХЕМИ МЕТРИК (ТРЕНУВАННЯ)
+# ==========================================
 class MetricCreate(BaseModel):
     date: dt.date = Field(..., description="Дата тренування")
     sleep_hours: float = Field(..., ge=0, le=24, description="Години сну")
     duration_minutes: int = Field(..., ge=0, description="Тривалість тренування (хвилини)")
     rpe_score: int = Field(..., ge=0, le=10, description="Оцінка RPE (1-10)")
-    activity_type: str = Field(..., description="Тип активності")
+    activity_type: ActivityCategory = Field(..., description="Тип активності")
     shoe_id: Optional[int] = Field(None, description="ID кросівок, якщо використовувались")
-    hrv_value: Optional[float] = Field(None, description="Варіабельність серцевого ритму (необов'язково)")
+    hrv_value: Optional[float] = Field(
+        None, 
+        ge=1.0, 
+        le=300.0, 
+        description="Варіабельність серцевого ритму rMSSD (1-300 мс)"
+    )
+
+    @model_validator(mode='after')
+    def validate_recovery_consistency(self) -> 'MetricCreate':
+        """Гарантує нульове навантаження для відновлювальних сесій."""
+        if self.activity_type == ActivityCategory.RECOVERY:
+            if self.duration_minutes > 0 or self.rpe_score > 0:
+                raise ValueError("Сесія типу 'Recovery' повинна мати duration_minutes=0 та rpe_score=0.")
+        return self
 
 class MetricResponse(MetricCreate):
     metric_id: int
@@ -85,7 +129,9 @@ class MetricResponse(MetricCreate):
     class Config:
         from_attributes = True
 
-# Схеми для згенерованих планів
+# ==========================================
+# СХЕМИ ШІ-ПЛАНІВ
+# ==========================================
 class PlanResponse(BaseModel):
     plan_id: int
     date: dt.date
@@ -96,7 +142,9 @@ class PlanResponse(BaseModel):
     class Config:
         from_attributes = True                     
 
-# Комплексна схема для Dashboard (має завжди бути знизу коду)
+# ==========================================
+# КОМПЛЕКСНА СХЕМА (DASHBOARD)
+# ==========================================
 class UserWithDetails(UserBase):
     user_id: int
     metrics: List[MetricResponse] = []
