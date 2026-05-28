@@ -127,7 +127,6 @@ onMounted(() => {
 
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
 })
-// ==========================================
 
 const login = async () => {
   isLoading.value = true
