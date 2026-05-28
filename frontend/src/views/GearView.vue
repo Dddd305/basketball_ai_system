@@ -74,6 +74,7 @@
                     v-model.number="calculatedCurrentHours" 
                     min="0" 
                     :max="calculatedMaxLifespan" 
+                    step="0.1" 
                     class="input-field mini-number"
                   />
                   <span class="hours-label">год</span>
@@ -205,7 +206,7 @@ const addShoe = async () => {
   }
 
   isAddingShoe.value = true
-  addSuccessMessage.value = '' // Очищаємо попереднє повідомлення
+  addSuccessMessage.value = ''
   
   try {
     const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';

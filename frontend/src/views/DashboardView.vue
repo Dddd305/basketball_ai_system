@@ -160,11 +160,11 @@
           </div>
           <div class="form-group edit-half-width" style="flex: 1 1 20%; min-width: 60px;">
             <label class="label">Зріст (см)</label>
-            <input type="number" v-model="editForm.height_cm" class="input-field mini-input" />
+            <input type="number" v-model="editForm.height_cm"  step="0.1" class="input-field mini-input" />
           </div>
           <div class="form-group edit-half-width" style="flex: 1 1 20%; min-width: 60px;">
             <label class="label">Вага (кг)</label>
-            <input type="number" v-model="editForm.weight_kg" class="input-field mini-input" />
+            <input type="number" v-model="editForm.weight_kg"  step="0.1" class="input-field mini-input" />
           </div>
         </div>
       </div>

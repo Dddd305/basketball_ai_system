@@ -144,7 +144,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue' // ДОДАНО: імпорт watch
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Settings, Mail, Lock, AlertTriangle, Trash2, Loader2, Eye, EyeOff } from 'lucide-vue-next'
 import { useUserStore } from '../stores/userStore'

@@ -56,6 +56,7 @@
               <input 
                 type="number" 
                 v-model.number="newMetric.hrv_value" 
+                step="0.1"
                 class="input-field" 
               />
             </div>
