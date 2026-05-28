@@ -53,11 +53,14 @@
             </div>
             <div class="form-group">
               <label>HRV (мс, необов'язково):</label>
-              <input 
-                type="number" 
-                v-model.number="newMetric.hrv_value" 
+              <input
+                type="number"
+                v-model.number="newMetric.hrv_value"
+                min="1"
+                max="300"
                 step="0.1"
-                class="input-field" 
+                placeholder="40–90 мс (норма)"
+                class="input-field"
               />
             </div>
           </div>

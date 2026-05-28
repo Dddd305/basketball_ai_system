@@ -109,9 +109,6 @@ const installPWA = async () => {
   deferredPrompt.value.prompt()
   const { outcome } = await deferredPrompt.value.userChoice
   
-  if (outcome === 'accepted') {
-    console.log('Користувач встановив додаток!')
-  }
   
   deferredPrompt.value = null
   showInstallButton.value = false
@@ -120,7 +117,6 @@ const installPWA = async () => {
 onMounted(() => {
   const savedUserId = localStorage.getItem('userId')
   if (savedUserId) {
-    console.log('Знайдено активну сесію. Автоматичний вхід...')
     router.push('/dashboard')
     return 
   }
@@ -137,7 +133,6 @@ const login = async () => {
     const savedUserId = localStorage.getItem('userId')
 
     if (savedUserId) {
-      console.log('Офлайн режим: Знайдено збережену сесію.')
       router.push('/dashboard')
     } else {
       errorMessage.value = 'Немає підключення. Для першого входу потрібен Інтернет.'
@@ -150,7 +145,6 @@ const login = async () => {
   // Стандартний логін
   try {
     const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
-    console.log('Спроба входу. API_URL:', API_URL);
     const response = await fetch(`${API_URL}/api/users/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -170,7 +164,7 @@ const login = async () => {
       const savedUserId = localStorage.getItem('userId')
       
       if (savedUserId) {
-        console.log('Збій мережі: Переходимо в офлайн режим.')
+        // Прибрано console.log
         router.push('/dashboard')
         return
       } else {

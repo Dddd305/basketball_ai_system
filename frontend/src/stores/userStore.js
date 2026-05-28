@@ -69,7 +69,6 @@ export const useUserStore = defineStore('user', {
       } catch (error) {
         if (error.name === 'AbortError') return
         
-        console.error('Помилка синхронізації:', error.message)
         this.error = error.message
 
         if (error.message === 'Токен протерміновано') {

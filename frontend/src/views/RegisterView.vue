@@ -137,7 +137,6 @@ const register = async () => {
 
   try {
     const API_URL = import.meta.env.VITE_API_URL || 'https://basketball-api-kyiv.onrender.com';
-    console.log('Спроба входу. API_URL:', API_URL);
     const response = await fetch(`${API_URL}/api/users/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
