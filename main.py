@@ -269,8 +269,14 @@ def get_user(
     acute_days = [m for m in sorted_metrics if (now - m.date).days <= 6]   # 7-денне вікно (включно з сьогодні)
     chronic_days = [m for m in sorted_metrics if (now - m.date).days <= 27] # 28-денне вікно
     
-    acute_load_total = sum(m.duration_minutes * m.rpe_score for m in acute_days)
-    chronic_load_total = sum(m.duration_minutes * m.rpe_score for m in chronic_days)
+    def calculate_load(metrics_list):
+            return sum(
+                m.duration_minutes * m.rpe_score * (1.25 if m.activity_type == "Game" else 1.0)
+                for m in metrics_list
+            )
+
+    acute_load_total = calculate_load(acute_days)
+    chronic_load_total = calculate_load(chronic_days)
     
     weeks_in_system = min(4, max(1, math.ceil(days_in_system / 7.0)))
     chronic_load_avg = chronic_load_total / weeks_in_system if weeks_in_system else 0
