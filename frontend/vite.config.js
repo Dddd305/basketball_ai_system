@@ -30,9 +30,9 @@ export default defineConfig({
       },
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'AI Basketball Tracker',
-        short_name: 'AI Hoops',
-        description: 'Система моніторингу навантаження та ШІ-планування для баскетболістів',
+        name: 'BAIPS - Basketball AI Injury Prevention System',
+        short_name: 'BAIPS',
+        description: 'Система превенції спортивних травм на основі ШІ',
         theme_color: '#ff9800',
         background_color: '#121212',
         display: 'standalone',

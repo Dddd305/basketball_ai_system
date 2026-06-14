@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Basketball AI System API",
+    title="BAIPS API",
     description="Бекенд з авторизацією та ШІ-плануванням",
     version="1.2.1"
 )

@@ -49,7 +49,7 @@ class DailyMetric(Base):
     def __repr__(self) -> str:
         return f"<DailyMetric(metric_id={self.metric_id}, date={self.date}, type='{self.activity_type}')>"
 
-# Таблиця 3: Моніторинг кросівок (наша фішка)
+# Таблиця 3: Моніторинг кросівок
 class ShoeInventory(Base):
     __tablename__ = "shoes_inventory"
 
